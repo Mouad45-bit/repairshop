@@ -7,7 +7,7 @@
         <!-- Connexion MySQL -->
         <property name="hibernate.connection.driver_class">com.mysql.cj.jdbc.Driver</property>
         <property name="hibernate.connection.url">
-            jdbc:mysql://localhost:3306/repairshop?useSSL=false&amp;serverTimezone=UTC
+            jdbc:mysql://localhost:3306/repairshop?useSSL=false&amp;serverTimezone=UTC&amp;allowPublicKeyRetrieval=true
         </property>
         <property name="hibernate.connection.username">repairuser</property>
         <property name="hibernate.connection.password">secret123</property>
