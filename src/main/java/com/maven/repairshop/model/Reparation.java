@@ -63,6 +63,5 @@ public class Reparation extends BaseEntity {
 
     // helpers (très important pour éviter les bugs)
     public void addPaiement(Paiement p) { paiements.add(p); p.setReparation(this); }
-    public void addCause(Cause c) { causes.add(c); c.setReparation(this); }
     public void addAppareil(Appareil a) { appareils.add(a); a.setReparation(this); }
 }

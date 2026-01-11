@@ -17,8 +17,8 @@ public class Cause extends BaseEntity {
     private double coutRestant;
 
     @ManyToOne
-    @JoinColumn(name="reparation_id", nullable=false)
-    private Reparation reparation;
+    @JoinColumn(name="appareil_id", nullable=false)
+    private Appareil appareil;
 
     public String getTypeCause() { return typeCause; }
     public void setTypeCause(String typeCause) { this.typeCause = typeCause; }
@@ -32,6 +32,6 @@ public class Cause extends BaseEntity {
     public double getCoutRestant() { return coutRestant; }
     public void setCoutRestant(double coutRestant) { this.coutRestant = coutRestant; }
 
-    public Reparation getReparation() { return reparation; }
-    public void setReparation(Reparation reparation) { this.reparation = reparation; }
+    public Appareil getAppareil() { return appareil; }
+    public void setAppareil(Appareil reparation) { this.appareil = appareil; }
 }
