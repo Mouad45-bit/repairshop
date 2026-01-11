@@ -3,6 +3,9 @@ package com.maven.repairshop.model;
 import com.maven.repairshop.model.base.BaseEntity;
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name="appareils")
 public class Appareil extends BaseEntity {
@@ -19,6 +22,9 @@ public class Appareil extends BaseEntity {
     @JoinColumn(name="reparation_id", nullable=false)
     private Reparation reparation;
 
+    @OneToMany(mappedBy="appareil", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Cause> causes = new ArrayList<>();
+
     public String getImei() { return imei; }
     public void setImei(String imei) { this.imei = imei; }
 
@@ -30,4 +36,7 @@ public class Appareil extends BaseEntity {
 
     public Reparation getReparation() { return reparation; }
     public void setReparation(Reparation reparation) { this.reparation = reparation; }
+
+    public List<Cause> getCauses() { return causes; }
+    public void addCause(Cause c) { causes.add(c); c.setAppareil(this); }
 }
