@@ -35,9 +35,6 @@ public class Reparation extends BaseEntity {
     private List<Paiement> paiements = new ArrayList<>();
 
     @OneToMany(mappedBy="reparation", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Cause> causes = new ArrayList<>();
-
-    @OneToMany(mappedBy="reparation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Appareil> appareils = new ArrayList<>();
 
     public String getCodeUnique() { return codeUnique; }
@@ -58,7 +55,6 @@ public class Reparation extends BaseEntity {
     public void setClient(Client client) { this.client = client; }
 
     public List<Paiement> getPaiements() { return paiements; }
-    public List<Cause> getCauses() { return causes; }
     public List<Appareil> getAppareils() { return appareils; }
 
     // helpers (très important pour éviter les bugs)
