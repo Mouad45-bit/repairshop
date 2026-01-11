@@ -23,12 +23,17 @@
         <property name="show_sql">true</property>
         <property name="format_sql">true</property>
 
-        <!-- Déclaration des entités (tu complèteras plus tard) -->
-        <!--
+        <!-- Déclaration des entités -->
+        <mapping class="com.maven.repairshop.model.Utilisateur"/>
+        <mapping class="com.maven.repairshop.model.Proprietaire"/>
+        <mapping class="com.maven.repairshop.model.Reparateur"/>
+        <mapping class="com.maven.repairshop.model.Boutique"/>
         <mapping class="com.maven.repairshop.model.Client"/>
+        <mapping class="com.maven.repairshop.model.Reparation"/>
+        <mapping class="com.maven.repairshop.model.Paiement"/>
+        <mapping class="com.maven.repairshop.model.Cause"/>
+        <mapping class="com.maven.repairshop.model.Appareil"/>
         <mapping class="com.maven.repairshop.model.Emprunt"/>
-        ...
-        -->
 
     </session-factory>
 </hibernate-configuration>
