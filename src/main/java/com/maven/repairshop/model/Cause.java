@@ -33,5 +33,5 @@ public class Cause extends BaseEntity {
     public void setCoutRestant(double coutRestant) { this.coutRestant = coutRestant; }
 
     public Appareil getAppareil() { return appareil; }
-    public void setAppareil(Appareil reparation) { this.appareil = appareil; }
+    public void setAppareil(Appareil appareil) { this.appareil = appareil; }
 }
