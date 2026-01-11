@@ -49,7 +49,9 @@ public class Reparation extends BaseEntity {
     public void setDateDernierStatut(LocalDateTime dateDernierStatut) { this.dateDernierStatut = dateDernierStatut; }
 
     public String getCommentaireTechnique() { return commentaireTechnique; }
-    public void setCommentaireTechnique() { this.commentaireTechnique = commentaireTechnique; }
+    public void setCommentaireTechnique(String commentaireTechnique) {
+        this.commentaireTechnique = commentaireTechnique;
+    }
 
     public Client getClient() { return client; }
     public void setClient(Client client) { this.client = client; }
