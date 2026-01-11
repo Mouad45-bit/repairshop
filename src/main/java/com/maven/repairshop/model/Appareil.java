@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 @Table(name="appareils")
 public class Appareil extends BaseEntity {
 
+    @Column(nullable = false, unique = true)
     private String imei;
 
     @Column(nullable=false)
