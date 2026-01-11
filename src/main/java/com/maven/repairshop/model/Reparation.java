@@ -24,6 +24,9 @@ public class Reparation extends BaseEntity {
     @Column(nullable=false)
     private LocalDateTime dateDernierStatut = LocalDateTime.now();
 
+    @Column(columnDefinition="TEXT")
+    private String commentaireTechnique;
+
     @ManyToOne
     @JoinColumn(name="client_id", nullable=false)
     private Client client;
@@ -47,6 +50,9 @@ public class Reparation extends BaseEntity {
 
     public LocalDateTime getDateDernierStatut() { return dateDernierStatut; }
     public void setDateDernierStatut(LocalDateTime dateDernierStatut) { this.dateDernierStatut = dateDernierStatut; }
+
+    public String getCommentaireTechnique() { return commentaireTechnique; }
+    public void setCommentaireTechnique() { this.commentaireTechnique = commentaireTechnique; }
 
     public Client getClient() { return client; }
     public void setClient(Client client) { this.client = client; }
