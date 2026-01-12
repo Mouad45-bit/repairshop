@@ -2,12 +2,11 @@ package model;
 
 public class Utilisateur {
     private Long id;
-    private String login;       // Son identifiant de connexion
-    private String password;    // Son mot de passe
-    private Role role;          // Est-il Patron ou Employé ?
-    private Boutique boutique;  // Dans quelle boutique il travaille ?
+    private String login;
+    private String password;    
+    private Role role;
+    private Boutique boutique; 
 
-    // Le Constructeur
     public Utilisateur(Long id, String login, String password, Role role, Boutique boutique) {
         this.id = id;
         this.login = login;
@@ -16,9 +15,19 @@ public class Utilisateur {
         this.boutique = boutique;
     }
 
-    // Les Getters (Lecture seule)
+    // --- LES GETTERS (Ce qu'il manquait) ---
+    
+    public Long getId() { 
+        return id; 
+    }
+
     public String getLogin() {
         return login;
+    }
+
+    // C'est celle-ci qui manquait pour corriger ton erreur !
+    public String getPassword() {
+        return password;
     }
 
     public Role getRole() {
@@ -29,11 +38,8 @@ public class Utilisateur {
         return boutique;
     }
     
-    // Pour l'affichage
     @Override
     public String toString() {
-        // On affiche le login et son rôle.
-        // Si il a une boutique, on affiche le nom de la boutique.
         String nomBoutique = "Aucune";
         if (this.boutique != null) {
             nomBoutique = this.boutique.getNom();
