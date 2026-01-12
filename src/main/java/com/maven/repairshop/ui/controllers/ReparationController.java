@@ -14,7 +14,6 @@ public class ReparationController {
     private final ReparationService service;
 
     public ReparationController() {
-        // UI only : on récupère l'interface via UiServices (mock maintenant)
         this.service = UiServices.get().reparations();
     }
 
@@ -41,13 +40,24 @@ public class ReparationController {
                 onSuccess);
     }
 
-    /** Trouver par id (utile pour détail) */
+    /** Trouver par id */
     public void trouverParId(Component parent,
                              Long reparationId,
                              Consumer<Reparation> onSuccess) {
 
         UiAsync.run(parent,
                 () -> service.trouverParId(reparationId),
+                onSuccess);
+    }
+
+    /** Créer une réparation (contract) */
+    public void creerReparation(Component parent,
+                                Long clientId,
+                                Long reparateurId,
+                                Consumer<Reparation> onSuccess) {
+
+        UiAsync.run(parent,
+                () -> service.creerReparation(clientId, reparateurId),
                 onSuccess);
     }
 }
