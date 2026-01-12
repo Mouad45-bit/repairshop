@@ -2,21 +2,37 @@ package com.maven.repairshop.ui.dialogs;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.awt.Window;
+import java.time.format.DateTimeFormatter;
 
 import javax.swing.*;
 
+import com.maven.repairshop.model.Reparation;
+import com.maven.repairshop.ui.controllers.SuiviController;
+import com.maven.repairshop.ui.session.SessionContext;
+
 public class SuiviDialog extends JDialog {
 
-    private JTextField txtCode;
+    private final SessionContext session;
+    private final SuiviController controller = new SuiviController();
 
+    private JTextField txtCode;
+    private JButton btnSuivre;
+    private JButton btnFermer;
+
+    private JLabel lblCode;
+    private JLabel lblClient;
     private JLabel lblStatut;
     private JLabel lblDate;
-    private JLabel lblInfo; // message complémentaire (reste à payer, etc.)
 
-    public SuiviDialog(Window owner) {
+    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    public SuiviDialog(Window owner, SessionContext session) {
         super(owner, "Suivi réparation", ModalityType.APPLICATION_MODAL);
-        setSize(520, 280);
+        this.session = session;
+
+        setSize(520, 260);
         setLocationRelativeTo(owner);
         initUi();
     }
@@ -24,76 +40,75 @@ public class SuiviDialog extends JDialog {
     private void initUi() {
         setLayout(new BorderLayout());
 
-        // ===== Top : saisie code =====
+        // Top: input
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        top.add(new JLabel("Code unique :"));
+        top.add(new JLabel("Code unique:"));
         txtCode = new JTextField(18);
         top.add(txtCode);
 
-        JButton btnSuivre = new JButton("Suivre");
+        btnSuivre = new JButton("Suivre");
         top.add(btnSuivre);
 
         add(top, BorderLayout.NORTH);
 
-        // ===== Centre : résultat =====
-        JPanel center = new JPanel();
-        center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
+        // Center: result
+        JPanel center = new JPanel(new GridLayout(4, 2, 10, 8));
         center.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
-        lblStatut = new JLabel("Statut : —");
-        lblDate = new JLabel("Dernière mise à jour : —");
-        lblInfo = new JLabel(" ");
+        center.add(new JLabel("Code:"));
+        lblCode = new JLabel("-");
+        center.add(lblCode);
 
-        lblStatut.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
-        lblDate.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
-        lblInfo.setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
+        center.add(new JLabel("Client:"));
+        lblClient = new JLabel("-");
+        center.add(lblClient);
 
+        center.add(new JLabel("Statut:"));
+        lblStatut = new JLabel("-");
         center.add(lblStatut);
+
+        center.add(new JLabel("Dernière mise à jour:"));
+        lblDate = new JLabel("-");
         center.add(lblDate);
-        center.add(lblInfo);
 
         add(center, BorderLayout.CENTER);
 
-        // ===== Bas : boutons =====
+        // Bottom: buttons
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnFermer = new JButton("Fermer");
+        btnFermer = new JButton("Fermer");
         bottom.add(btnFermer);
         add(bottom, BorderLayout.SOUTH);
 
-        // ===== Events =====
+        // events
+        btnSuivre.addActionListener(e -> onSuivre());
         btnFermer.addActionListener(e -> dispose());
 
-        btnSuivre.addActionListener(e -> doSuivre());
-        txtCode.addActionListener(e -> doSuivre()); // Entrée = suivre
+        getRootPane().setDefaultButton(btnSuivre);
     }
 
-    private void doSuivre() {
-        String code = txtCode.getText() != null ? txtCode.getText().trim() : "";
-        if (code.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Veuillez saisir le code unique.");
-            return;
-        }
+    private void onSuivre() {
+        String code = txtCode.getText();
 
-        // ===== Version UI-only pour l’instant =====
-        // Plus tard, remplacer par :
-        // SuiviDTO dto = ServiceRegistry.get().suiviService().suivreParCode(code);
-        // lblStatut.setText("Statut : " + dto.getStatut());
-        // lblDate.setText("Dernière mise à jour : " + dto.getDateDernierStatut());
-        // lblInfo.setText(dto.getResteAPayer() != null ? "Reste à payer : " + dto.getResteAPayer() : " ");
+        Long reparateurId = currentReparateurId();
+        controller.suivre(this, code, reparateurId, this::showResult);
+    }
 
-        // Fake data pour voir l’écran fonctionner :
-        if (code.equalsIgnoreCase("R-8F2A1")) {
-            lblStatut.setText("Statut : EN_COURS");
-            lblDate.setText("Dernière mise à jour : 2026-01-12");
-            lblInfo.setText("Veuillez patienter. Votre appareil est en cours de réparation.");
-        } else if (code.equalsIgnoreCase("R-91BC0")) {
-            lblStatut.setText("Statut : TERMINEE");
-            lblDate.setText("Dernière mise à jour : 2026-01-10");
-            lblInfo.setText("Réparation terminée. Passez récupérer votre appareil.");
-        } else {
-            lblStatut.setText("Statut : —");
-            lblDate.setText("Dernière mise à jour : —");
-            lblInfo.setText("Aucune réparation trouvée pour ce code.");
-        }
+    private void showResult(Reparation r) {
+        lblCode.setText(safe(r.getCodeUnique()));
+        lblClient.setText(r.getClient() != null ? safe(r.getClient().getNom()) : "");
+        lblStatut.setText(r.getStatut() != null ? r.getStatut().name() : "");
+        lblDate.setText(r.getDateDernierStatut() != null ? r.getDateDernierStatut().format(DT_FMT) : "");
+    }
+
+    private Long currentReparateurId() {
+        try {
+            var user = session.getUser();
+            if (user != null) return user.getId();
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 }
