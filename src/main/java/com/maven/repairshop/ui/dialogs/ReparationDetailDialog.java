@@ -9,9 +9,15 @@ import java.time.format.DateTimeFormatter;
 import javax.swing.*;
 
 import com.maven.repairshop.model.Reparation;
+import com.maven.repairshop.model.enums.StatutReparation;
 import com.maven.repairshop.ui.controllers.ReparationController;
 import com.maven.repairshop.ui.session.SessionContext;
 
+/**
+ * - Afficher détail réparation
+ * - Modifier le statut depuis le détail (Combo + bouton Enregistrer)
+ * - Appels uniquement via ReparationController (contract)
+ */
 public class ReparationDetailDialog extends JDialog {
 
     private final SessionContext session;
@@ -19,14 +25,20 @@ public class ReparationDetailDialog extends JDialog {
 
     private final Long reparationId;
 
+    // Affichage
     private JLabel lblId;
     private JLabel lblCode;
     private JLabel lblClient;
     private JLabel lblTelephone;
-    private JLabel lblStatut;
     private JLabel lblDernierStatut;
 
+    // Statut éditable
+    private JComboBox<StatutReparation> cbStatut;
+    private JButton btnEnregistrer;
+
     private JButton btnFermer;
+
+    private Reparation current; // snapshot chargé
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -35,8 +47,9 @@ public class ReparationDetailDialog extends JDialog {
         this.session = session;
         this.reparationId = reparationId;
 
-        setSize(560, 320);
+        setSize(620, 360);
         setLocationRelativeTo(owner);
+
         initUi();
         loadData();
     }
@@ -63,9 +76,10 @@ public class ReparationDetailDialog extends JDialog {
         lblTelephone = new JLabel("-");
         center.add(lblTelephone);
 
+        // Statut (modifiable)
         center.add(new JLabel("Statut:"));
-        lblStatut = new JLabel("-");
-        center.add(lblStatut);
+        cbStatut = new JComboBox<>(StatutReparation.values());
+        center.add(cbStatut);
 
         center.add(new JLabel("Dernière mise à jour:"));
         lblDernierStatut = new JLabel("-");
@@ -74,11 +88,22 @@ public class ReparationDetailDialog extends JDialog {
         add(center, BorderLayout.CENTER);
 
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnEnregistrer = new JButton("Enregistrer");
         btnFermer = new JButton("Fermer");
+
+        btnEnregistrer.setEnabled(false);
+
+        btnEnregistrer.addActionListener(e -> onEnregistrer());
         btnFermer.addActionListener(e -> dispose());
+
+        cbStatut.addActionListener(e -> refreshSaveEnabled());
+
+        bottom.add(btnEnregistrer);
         bottom.add(btnFermer);
 
         add(bottom, BorderLayout.SOUTH);
+
+        getRootPane().setDefaultButton(btnEnregistrer);
     }
 
     private void loadData() {
@@ -86,6 +111,8 @@ public class ReparationDetailDialog extends JDialog {
     }
 
     private void fill(Reparation r) {
+        this.current = r;
+
         lblId.setText(r.getId() != null ? String.valueOf(r.getId()) : "-");
         lblCode.setText(safe(r.getCodeUnique()));
 
@@ -97,10 +124,55 @@ public class ReparationDetailDialog extends JDialog {
             lblTelephone.setText("");
         }
 
-        lblStatut.setText(r.getStatut() != null ? r.getStatut().name() : "");
+        if (r.getStatut() != null) cbStatut.setSelectedItem(r.getStatut());
+
         lblDernierStatut.setText(
                 r.getDateDernierStatut() != null ? r.getDateDernierStatut().format(DT_FMT) : ""
         );
+
+        refreshSaveEnabled();
+    }
+
+    private void refreshSaveEnabled() {
+        if (current == null) {
+            btnEnregistrer.setEnabled(false);
+            return;
+        }
+        StatutReparation selected = (StatutReparation) cbStatut.getSelectedItem();
+        btnEnregistrer.setEnabled(selected != null && current.getStatut() != selected);
+    }
+
+    private void onEnregistrer() {
+        if (current == null) return;
+
+        StatutReparation nouveau = (StatutReparation) cbStatut.getSelectedItem();
+        if (nouveau == null) return;
+
+        // Si pas de changement, rien à faire
+        if (current.getStatut() == nouveau) {
+            JOptionPane.showMessageDialog(this, "Aucun changement de statut.");
+            return;
+        }
+
+        int ok = JOptionPane.showConfirmDialog(
+                this,
+                "Confirmer le changement de statut vers : " + nouveau.name() + " ?",
+                "Changer statut",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (ok != JOptionPane.YES_OPTION) {
+            // remet l'ancien statut (sécurité UI)
+            cbStatut.setSelectedItem(current.getStatut());
+            refreshSaveEnabled();
+            return;
+        }
+
+        // Appel contract via controller
+        controller.changerStatut(this, reparationId, nouveau, () -> {
+            // Recharge après save pour refléter dateDernierStatut, statut, etc.
+            loadData();
+            JOptionPane.showMessageDialog(this, "Statut mis à jour.");
+        });
     }
 
     private static String safe(String s) {
