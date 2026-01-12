@@ -2,35 +2,39 @@ package com.maven.repairshop.ui.pages;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
-import com.maven.repairshop.ui.dialogs.EmpruntDialog;
-import com.maven.repairshop.ui.session.SessionContext;
-
-import com.maven.repairshop.ui.controllers.ControllerRegistry;
+import com.maven.repairshop.model.Emprunt;
+import com.maven.repairshop.model.enums.StatutEmprunt;
+import com.maven.repairshop.model.enums.TypeEmprunt;
 import com.maven.repairshop.ui.controllers.EmpruntController;
 import com.maven.repairshop.ui.controllers.UiDialogs;
-import com.maven.repairshop.model.enums.TypeEmprunt;
+import com.maven.repairshop.ui.dialogs.EmpruntDialog;
+import com.maven.repairshop.ui.session.SessionContext;
+import com.maven.repairshop.ui.util.UiServices;
 
 public class EmpruntsPanel extends JPanel {
 
     private final SessionContext session;
 
-    private final EmpruntController ctrl = ControllerRegistry.get().emprunts();
+    private final EmpruntController ctrl = new EmpruntController(UiServices.get().emprunts());
 
     private JTable table;
     private DefaultTableModel model;
 
     private JTextField txtSearch;
-    private JComboBox<String> cbType;
-    private JComboBox<String> cbStatut;
+    private JComboBox<Object> cbType;
+    private JComboBox<Object> cbStatut;
 
     private JLabel lblTotalEmprunts;
     private JLabel lblTotalPrets;
+
+    private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public EmpruntsPanel(SessionContext session) {
         this.session = session;
@@ -47,13 +51,18 @@ public class EmpruntsPanel extends JPanel {
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT));
         txtSearch = new JTextField(16);
 
-        cbType = new JComboBox<>(new String[] { "Tous", "EMPRUNT", "PRET" });
-        cbStatut = new JComboBox<>(new String[] { "Tous", "EN_COURS", "REMBOURSE", "PARTIEL" });
+        cbType = new JComboBox<>();
+        cbType.addItem("Tous");
+        for (TypeEmprunt t : TypeEmprunt.values()) cbType.addItem(t);
+
+        cbStatut = new JComboBox<>();
+        cbStatut.addItem("Tous");
+        for (StatutEmprunt s : StatutEmprunt.values()) cbStatut.addItem(s);
 
         JButton btnSearch = new JButton("Rechercher");
         JButton btnRefresh = new JButton("Actualiser");
 
-        left.add(new JLabel("Personne:"));
+        left.add(new JLabel("Personne / Motif:"));
         left.add(txtSearch);
         left.add(new JLabel("Type:"));
         left.add(cbType);
@@ -73,7 +82,7 @@ public class EmpruntsPanel extends JPanel {
 
         // ===== TABLE =====
         model = new DefaultTableModel(
-                new Object[] { "ID", "Type", "Personne", "Montant", "Date", "Statut", "Remarque" }, 0
+                new Object[] { "ID", "Type", "Personne", "Montant", "Date", "Statut", "Motif" }, 0
         ) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -95,11 +104,11 @@ public class EmpruntsPanel extends JPanel {
         bottom.add(totals, BorderLayout.WEST);
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnEdit = new JButton("Modifier");
         JButton btnMarkPaid = new JButton("Marquer remboursé");
+        JButton btnDelete = new JButton("Supprimer");
         JButton btnDetail = new JButton("Détail");
-        actions.add(btnEdit);
         actions.add(btnMarkPaid);
+        actions.add(btnDelete);
         actions.add(btnDetail);
 
         bottom.add(actions, BorderLayout.EAST);
@@ -107,9 +116,7 @@ public class EmpruntsPanel extends JPanel {
         add(bottom, BorderLayout.SOUTH);
 
         // ===== EVENTS =====
-
         btnAdd.addActionListener(e -> openCreate());
-        btnEdit.addActionListener(e -> openEditSelected());
         btnDetail.addActionListener(e -> showDetailSelected());
 
         btnMarkPaid.addActionListener(e -> {
@@ -117,19 +124,38 @@ public class EmpruntsPanel extends JPanel {
             if (id == null) return;
 
             int ok = JOptionPane.showConfirmDialog(this,
-                    "Marquer cet emprunt/prêt comme REMBOURSÉ ?",
+                    "Marquer comme REMBOURSÉ ?",
                     "Confirmation",
                     JOptionPane.YES_NO_OPTION);
 
             if (ok == JOptionPane.YES_OPTION) {
-                ctrl.changerStatut(this, id, "REMBOURSE", () -> {
+                ctrl.changerStatut(this, id, StatutEmprunt.REMBOURSE.name(), () -> {
                     UiDialogs.info(this, "Statut mis à jour.");
                     refresh();
                 });
             }
         });
 
+        btnDelete.addActionListener(e -> {
+            Long id = getSelectedId();
+            if (id == null) return;
+
+            int ok = JOptionPane.showConfirmDialog(this,
+                    "Supprimer cet emprunt/prêt ?",
+                    "Confirmation",
+                    JOptionPane.YES_NO_OPTION);
+            if (ok != JOptionPane.YES_OPTION) return;
+
+            ctrl.supprimer(this, id, () -> {
+                UiDialogs.info(this, "Supprimé.");
+                refresh();
+            });
+        });
+
         btnSearch.addActionListener(e -> refresh());
+        txtSearch.addActionListener(e -> refresh());
+        cbType.addActionListener(e -> refresh());
+        cbStatut.addActionListener(e -> refresh());
 
         btnRefresh.addActionListener(e -> {
             txtSearch.setText("");
@@ -137,8 +163,6 @@ public class EmpruntsPanel extends JPanel {
             cbStatut.setSelectedIndex(0);
             refresh();
         });
-
-        txtSearch.addActionListener(e -> refresh());
     }
 
     private void openCreate() {
@@ -159,76 +183,11 @@ public class EmpruntsPanel extends JPanel {
 
         TypeEmprunt type = "PRET".equalsIgnoreCase(data.type) ? TypeEmprunt.PRET : TypeEmprunt.EMPRUNT;
 
-        // NOTE: ctrl.creer(...) actuel accepte (reparateurId, type, personne, montantStr, motif, onSuccess)
-        // On map "remarque" -> "motif"
+        // create() n'accepte pas date/statut => statut = EN_COURS par défaut côté service
         ctrl.creer(this, reparateurId, type, data.personne, data.montantStr, data.remarque, created -> {
             UiDialogs.info(this, "Ajout OK.");
             refresh();
         });
-    }
-
-    private void openEditSelected() {
-        Long id = getSelectedId();
-        if (id == null) return;
-
-        int row = table.getSelectedRow();
-        String type = safe(model.getValueAt(row, 1));
-        String personne = safe(model.getValueAt(row, 2));
-        String montant = safe(model.getValueAt(row, 3));
-        String date = safe(model.getValueAt(row, 4));
-        String statut = safe(model.getValueAt(row, 5));
-        String remarque = safe(model.getValueAt(row, 6));
-
-        EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this));
-        dlg.setModeEdit(id, type, personne, montant, date, statut, remarque);
-        dlg.setVisible(true);
-
-        if (!dlg.isSaved()) return;
-
-        // ⚠️ Pour finaliser "EDIT", il faut une méthode service/controller "modifier(...)"
-        // Si tu l'ajoutes, je branche ça exactement comme ClientsPanel.
-        UiDialogs.warn(this,
-                "Modification prête côté UI.\n" +
-                "À brancher quand EmpruntService.modifier(...) existe.");
-    }
-
-    private void showDetailSelected() {
-        Long id = getSelectedId();
-        if (id == null) return;
-
-        int row = table.getSelectedRow();
-        String type = safe(model.getValueAt(row, 1));
-        String personne = safe(model.getValueAt(row, 2));
-        String montant = safe(model.getValueAt(row, 3));
-        String date = safe(model.getValueAt(row, 4));
-        String statut = safe(model.getValueAt(row, 5));
-        String remarque = safe(model.getValueAt(row, 6));
-
-        JOptionPane.showMessageDialog(this,
-                "Emprunt/Prêt #" + id + "\n" +
-                "Type: " + type + "\n" +
-                "Personne: " + personne + "\n" +
-                "Montant: " + montant + "\n" +
-                "Date: " + date + "\n" +
-                "Statut: " + statut + "\n" +
-                "Remarque: " + remarque,
-                "Détail",
-                JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    private Long getSelectedId() {
-        int row = table.getSelectedRow();
-        if (row < 0) {
-            UiDialogs.warn(this, "Sélectionne une ligne d'abord.");
-            return null;
-        }
-        Object v = model.getValueAt(row, 0);
-        if (v == null) return null;
-        try {
-            return Long.valueOf(v.toString());
-        } catch (Exception ex) {
-            return null;
-        }
     }
 
     private void refresh() {
@@ -248,44 +207,37 @@ public class EmpruntsPanel extends JPanel {
         });
     }
 
-    private List<Object[]> toRowsFiltered(List<?> rawList) {
+    private List<Object[]> toRowsFiltered(List<Emprunt> list) {
         String q = txtSearch.getText() != null ? txtSearch.getText().trim().toLowerCase() : "";
-        String typeSel = (String) cbType.getSelectedItem();
-        String statutSel = (String) cbStatut.getSelectedItem();
+        Object typeSel = cbType.getSelectedItem();
+        Object statutSel = cbStatut.getSelectedItem();
+
+        TypeEmprunt typeFilter = (typeSel instanceof TypeEmprunt) ? (TypeEmprunt) typeSel : null;
+        StatutEmprunt statutFilter = (statutSel instanceof StatutEmprunt) ? (StatutEmprunt) statutSel : null;
 
         List<Object[]> out = new ArrayList<>();
 
-        for (Object e : rawList) {
-            String personne = safeStr(call(e, "getNomPersonne"));
-            String motif = safeStr(call(e, "getMotif"));
-
-            String type = safeStr(call(e, "getType"));
-            String statut = safeStr(call(e, "getStatut"));
+        for (Emprunt e : list) {
+            String personne = safe(e.getNomPersonne());
+            String motif = safe(e.getMotif());
 
             if (!q.isEmpty()) {
                 String hay = (personne + " " + motif).toLowerCase();
                 if (!hay.contains(q)) continue;
             }
 
-            if (!"Tous".equalsIgnoreCase(typeSel)) {
-                if (!typeSel.equalsIgnoreCase(type)) continue;
-            }
+            if (typeFilter != null && e.getType() != typeFilter) continue;
+            if (statutFilter != null && e.getStatut() != statutFilter) continue;
 
-            if (!"Tous".equalsIgnoreCase(statutSel)) {
-                if (!statutSel.equalsIgnoreCase(statut)) continue;
-            }
-
-            Object id = call(e, "getId");
-            Object montant = call(e, "getMontant");
-            Object date = call(e, "getDateEmprunt");
+            String dt = e.getDateEmprunt() != null ? e.getDateEmprunt().format(DT) : "";
 
             out.add(new Object[] {
-                    id,
-                    type,
+                    e.getId(),
+                    e.getType(),
                     personne,
-                    montant,
-                    date,
-                    statut,
+                    e.getMontant(),
+                    dt,
+                    e.getStatut(),
                     motif
             });
         }
@@ -301,7 +253,8 @@ public class EmpruntsPanel extends JPanel {
             String type = r[1] != null ? r[1].toString() : "";
             String statut = r[5] != null ? r[5].toString() : "";
 
-            if (!("EN_COURS".equalsIgnoreCase(statut) || "PARTIEL".equalsIgnoreCase(statut))) {
+            // "en cours" = EN_COURS ou PARTIELLEMENT_REMBOURSE
+            if (!("EN_COURS".equalsIgnoreCase(statut) || "PARTIELLEMENT_REMBOURSE".equalsIgnoreCase(statut))) {
                 continue;
             }
 
@@ -318,21 +271,48 @@ public class EmpruntsPanel extends JPanel {
         lblTotalPrets.setText("Total prêts en cours: " + formatDh(totalPrets));
     }
 
-    private String formatDh(double v) {
-        if (v == (long) v) return ((long) v) + " DH";
-        return String.format("%.2f DH", v);
+    private void showDetailSelected() {
+        Long id = getSelectedId();
+        if (id == null) return;
+
+        int row = table.getSelectedRow();
+        String type = safe(model.getValueAt(row, 1));
+        String personne = safe(model.getValueAt(row, 2));
+        String montant = safe(model.getValueAt(row, 3));
+        String date = safe(model.getValueAt(row, 4));
+        String statut = safe(model.getValueAt(row, 5));
+        String motif = safe(model.getValueAt(row, 6));
+
+        JOptionPane.showMessageDialog(this,
+                "Emprunt/Prêt #" + id + "\n" +
+                "Type: " + type + "\n" +
+                "Personne: " + personne + "\n" +
+                "Montant: " + montant + "\n" +
+                "Date: " + date + "\n" +
+                "Statut: " + statut + "\n" +
+                "Motif: " + motif,
+                "Détail",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
-    private Object call(Object obj, String method) {
+    private Long getSelectedId() {
+        int row = table.getSelectedRow();
+        if (row < 0) {
+            UiDialogs.warn(this, "Sélectionne une ligne d'abord.");
+            return null;
+        }
+        Object v = model.getValueAt(row, 0);
+        if (v == null) return null;
         try {
-            return obj.getClass().getMethod(method).invoke(obj);
+            return Long.valueOf(v.toString());
         } catch (Exception ex) {
             return null;
         }
     }
 
-    private String safeStr(Object v) {
-        return v == null ? "" : v.toString();
+    private String formatDh(double v) {
+        if (v == (long) v) return ((long) v) + " DH";
+        return String.format("%.2f DH", v);
     }
 
     private String safe(Object o) {
