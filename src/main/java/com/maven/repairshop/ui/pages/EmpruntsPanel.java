@@ -2,6 +2,8 @@ package com.maven.repairshop.ui.pages;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -9,9 +11,15 @@ import javax.swing.table.DefaultTableModel;
 import com.maven.repairshop.ui.dialogs.EmpruntDialog;
 import com.maven.repairshop.ui.session.SessionContext;
 
+import com.maven.repairshop.ui.controllers.ControllerRegistry;
+import com.maven.repairshop.ui.controllers.UiDialogs;
+import com.maven.repairshop.model.enums.TypeEmprunt;
+
 public class EmpruntsPanel extends JPanel {
 
     private final SessionContext session;
+
+    private final var ctrl = ControllerRegistry.get().emprunts();
 
     private JTable table;
     private DefaultTableModel model;
@@ -26,7 +34,9 @@ public class EmpruntsPanel extends JPanel {
     public EmpruntsPanel(SessionContext session) {
         this.session = session;
         initUi();
-        // plus tard: refresh();
+
+        // On charge directement depuis la DB via controller
+        refresh();
     }
 
     private void initUi() {
@@ -97,11 +107,18 @@ public class EmpruntsPanel extends JPanel {
 
         add(bottom, BorderLayout.SOUTH);
 
-        // ===== EVENTS (UI only pour l’instant) =====
+        // ===== EVENTS =====
+
+        // Ajouter (UI dialog pour l’instant)
         btnAdd.addActionListener(e -> openCreate());
+
+        // Modifier (UI dialog pour l’instant)
         btnEdit.addActionListener(e -> openEditSelected());
+
+        // Détail (simple message pour l’instant)
         btnDetail.addActionListener(e -> showDetailSelected());
 
+        // Marquer remboursé (branché controller)
         btnMarkPaid.addActionListener(e -> {
             Long id = getSelectedId();
             if (id == null) return;
@@ -112,29 +129,37 @@ public class EmpruntsPanel extends JPanel {
                     JOptionPane.YES_NO_OPTION);
 
             if (ok == JOptionPane.YES_OPTION) {
-                // plus tard: empruntService.marquerRembourse(id, session)
-                JOptionPane.showMessageDialog(this, "Marqué remboursé (à brancher service)");
+                ctrl.changerStatut(this, id, "REMBOURSE", () -> {
+                    UiDialogs.info(this, "Statut mis à jour.");
+                    refresh();
+                });
             }
         });
 
-        btnSearch.addActionListener(e -> {
-            // plus tard: refresh avec filtres
-            JOptionPane.showMessageDialog(this, "Recherche (à brancher service)");
-        });
+        // Rechercher = refresh (filtre appliqué côté UI)
+        btnSearch.addActionListener(e -> refresh());
 
+        // Actualiser = refresh
         btnRefresh.addActionListener(e -> {
-            // plus tard: refresh()
-            JOptionPane.showMessageDialog(this, "Actualiser (à brancher service)");
+            txtSearch.setText("");
+            cbType.setSelectedIndex(0);
+            cbStatut.setSelectedIndex(0);
+            refresh();
         });
 
-        // Données fake pour voir l’UI tout de suite
-        seedFakeRows();
+        // Enter dans recherche => refresh
+        txtSearch.addActionListener(e -> refresh());
     }
 
     private void openCreate() {
         EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this), session);
         dlg.setVisible(true);
-        // plus tard: if (dlg.isSaved()) refresh();
+
+        // Si ton dialog met "saved=true", on refresh
+        if (dlg.isSaved()) {
+            UiDialogs.info(this, "Ajout OK.");
+            refresh();
+        }
     }
 
     private void openEditSelected() {
@@ -142,9 +167,13 @@ public class EmpruntsPanel extends JPanel {
         if (id == null) return;
 
         EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this), session);
-        dlg.setModeEdit(id); // UI-only
+        dlg.setModeEdit(id);
         dlg.setVisible(true);
-        // plus tard: refresh();
+
+        if (dlg.isSaved()) {
+            UiDialogs.info(this, "Modification OK.");
+            refresh();
+        }
     }
 
     private void showDetailSelected() {
@@ -160,7 +189,7 @@ public class EmpruntsPanel extends JPanel {
     private Long getSelectedId() {
         int row = table.getSelectedRow();
         if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Sélectionne une ligne d'abord.");
+            UiDialogs.warn(this, "Sélectionne une ligne d'abord.");
             return null;
         }
         Object v = model.getValueAt(row, 0);
@@ -172,14 +201,135 @@ public class EmpruntsPanel extends JPanel {
         }
     }
 
-    private void seedFakeRows() {
-        model.setRowCount(0);
-        model.addRow(new Object[] { 1, "EMPRUNT", "Youssef", "500", "2026-01-05", "EN_COURS", "A rendre fin du mois" });
-        model.addRow(new Object[] { 2, "PRET", "Hamza", "300", "2026-01-07", "PARTIEL", "Déjà reçu 100" });
-        model.addRow(new Object[] { 3, "EMPRUNT", "Khadija", "200", "2026-01-02", "REMBOURSE", "" });
+    /**
+     * Charge depuis la DB via controller (async),
+     * puis applique les filtres côté UI et calcule les totaux.
+     */
+    private void refresh() {
+        // Cette page est faite pour le réparateur.
+        Long reparateurId = session.getReparateurId();
+        if (reparateurId == null) {
+            UiDialogs.warn(this, "Cette page est réservée au réparateur (session invalide).");
+            return;
+        }
 
-        // Totaux fake
-        lblTotalEmprunts.setText("Total emprunts en cours: 500 DH");
-        lblTotalPrets.setText("Total prêts en cours: 200 DH");
+        ctrl.lister(this, reparateurId, list -> {
+            // Appliquer filtres UI
+            List<Object[]> rows = toRowsFiltered(list);
+
+            // Remplir table
+            model.setRowCount(0);
+            for (Object[] r : rows) model.addRow(r);
+
+            // Totaux
+            updateTotalsFromRows(rows);
+        });
+    }
+
+    private List<Object[]> toRowsFiltered(List<?> rawList) {
+        // On travaille en "var" au runtime, pas besoin de type générique
+        String q = txtSearch.getText() != null ? txtSearch.getText().trim().toLowerCase() : "";
+        String typeSel = (String) cbType.getSelectedItem();
+        String statutSel = (String) cbStatut.getSelectedItem();
+
+        List<Object[]> out = new ArrayList<>();
+
+        for (var e : rawList) {
+            // --- champs attendus selon ton modèle ---
+            // e.getType() : TypeEmprunt
+            // e.getNomPersonne() : String
+            // e.getMontant() : double
+            // e.getDateEmprunt() : Date/LocalDate/String
+            // e.getStatut() : enum
+            // e.getMotif() : String
+
+            String personne = safeStr(call(e, "getNomPersonne"));
+            String motif = safeStr(call(e, "getMotif"));
+
+            String type = safeStr(call(e, "getType"));   // ex: EMPRUNT/PRET
+            String statut = safeStr(call(e, "getStatut")); // ex: EN_COURS/REMBOURSE/PARTIEL
+
+            // filtre personne
+            if (!q.isEmpty()) {
+                String hay = (personne + " " + motif).toLowerCase();
+                if (!hay.contains(q)) continue;
+            }
+
+            // filtre type
+            if (!"Tous".equalsIgnoreCase(typeSel)) {
+                if (!typeSel.equalsIgnoreCase(type)) continue;
+            }
+
+            // filtre statut
+            if (!"Tous".equalsIgnoreCase(statutSel)) {
+                if (!statutSel.equalsIgnoreCase(statut)) continue;
+            }
+
+            Object id = call(e, "getId");
+            Object montant = call(e, "getMontant");
+            Object date = call(e, "getDateEmprunt");
+
+            out.add(new Object[] {
+                    id,
+                    type,
+                    personne,
+                    montant,
+                    date,
+                    statut,
+                    motif
+            });
+        }
+
+        return out;
+    }
+
+    /**
+     * Totaux "en cours" :
+     * - EN_COURS + PARTIEL (toute autre valeur est ignorée)
+     * - EMPRUNT => total emprunts
+     * - PRET => total prêts
+     */
+    private void updateTotalsFromRows(List<Object[]> rows) {
+        double totalEmprunts = 0;
+        double totalPrets = 0;
+
+        for (Object[] r : rows) {
+            String type = r[1] != null ? r[1].toString() : "";
+            String statut = r[5] != null ? r[5].toString() : "";
+
+            if (!("EN_COURS".equalsIgnoreCase(statut) || "PARTIEL".equalsIgnoreCase(statut))) {
+                continue;
+            }
+
+            double montant = 0;
+            try {
+                montant = Double.parseDouble(r[3].toString().replace(",", "."));
+            } catch (Exception ignored) {}
+
+            if ("EMPRUNT".equalsIgnoreCase(type)) totalEmprunts += montant;
+            if ("PRET".equalsIgnoreCase(type)) totalPrets += montant;
+        }
+
+        lblTotalEmprunts.setText("Total emprunts en cours: " + formatDh(totalEmprunts));
+        lblTotalPrets.setText("Total prêts en cours: " + formatDh(totalPrets));
+    }
+
+    private String formatDh(double v) {
+        // simple: pas de DecimalFormat pour rester léger
+        if (v == (long) v) return ((long) v) + " DH";
+        return String.format("%.2f DH", v);
+    }
+
+    // --------- Helpers (évite de casser si ton modèle n'a pas exactement les mêmes méthodes) ---------
+    private Object call(Object obj, String method) {
+        try {
+            return obj.getClass().getMethod(method).invoke(obj);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private String safeStr(Object v) {
+        return v == null ? "" : v.toString();
     }
 }
