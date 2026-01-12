@@ -10,13 +10,13 @@ import com.maven.repairshop.model.Client;
 import com.maven.repairshop.ui.controllers.ClientController;
 import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.UiDialogs;
+import com.maven.repairshop.ui.dialogs.ClientDialog;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class ClientsPanel extends JPanel {
 
     private final SessionContext session;
 
-    //
     private final ClientController ctrl = ControllerRegistry.get().clients();
 
     private JTable table;
@@ -26,15 +26,13 @@ public class ClientsPanel extends JPanel {
     public ClientsPanel(SessionContext session) {
         this.session = session;
         initUi();
-
-        // Charge DB → JTable
         refresh();
     }
 
     private void initUi() {
         setLayout(new BorderLayout());
 
-        // Top
+        // ===== TOP =====
         JPanel top = new JPanel(new BorderLayout());
 
         JPanel search = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -56,7 +54,7 @@ public class ClientsPanel extends JPanel {
 
         add(top, BorderLayout.NORTH);
 
-        // Table
+        // ===== TABLE =====
         model = new DefaultTableModel(new Object[] { "ID", "Nom", "Téléphone", "Email", "Ville" }, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -64,7 +62,7 @@ public class ClientsPanel extends JPanel {
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         add(new JScrollPane(table), BorderLayout.CENTER);
 
-        // Bottom actions
+        // ===== BOTTOM =====
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton btnEdit = new JButton("Modifier");
         JButton btnDelete = new JButton("Supprimer");
@@ -74,7 +72,7 @@ public class ClientsPanel extends JPanel {
         bottom.add(btnDetail);
         add(bottom, BorderLayout.SOUTH);
 
-        // Events (branchés controller)
+        // ===== EVENTS =====
         btnSearch.addActionListener(e -> refresh());
         txtSearch.addActionListener(e -> refresh());
 
@@ -83,16 +81,9 @@ public class ClientsPanel extends JPanel {
             refresh();
         });
 
-        // Ajout (pour l’instant via inputs simples)
         btnAdd.addActionListener(e -> createClient());
-
-        // Modif (inputs simples)
         btnEdit.addActionListener(e -> editClient());
-
-        // Suppression (controller)
         btnDelete.addActionListener(e -> deleteClient());
-
-        // Détail (simple affichage pour l’instant)
         btnDetail.addActionListener(e -> showDetail());
     }
 
@@ -132,63 +123,56 @@ public class ClientsPanel extends JPanel {
             return;
         }
 
-        // Saisie rapide (tu peux remplacer par ClientDialog plus tard)
-        String nom = ask("Nom*", "");
-        if (nom == null) return;
+        ClientDialog dlg = new ClientDialog(SwingUtilities.getWindowAncestor(this));
+        dlg.setModeCreate();
+        dlg.setVisible(true);
 
-        String tel = ask("Téléphone*", "");
-        if (tel == null) return;
+        if (!dlg.isSaved()) return;
 
-        String email = ask("Email (optionnel)", "");
-        if (email == null) return;
+        ClientDialog.ClientFormData data = dlg.getFormData();
+        if (data == null) return;
 
-        String adresse = ask("Adresse (optionnel)", "");
-        if (adresse == null) return;
+        // Adresse + imagePath pas encore dans ton dialog => valeurs par défaut
+        String adresse = "";
+        String imagePath = "";
 
-        String ville = ask("Ville (optionnel)", "");
-        if (ville == null) return;
-
-        String imagePath = ""; // pas obligatoire (plus tard)
-
-        ctrl.creer(this, reparateurId, nom, tel, email, adresse, ville, imagePath, created -> {
-            UiDialogs.info(this, "Client ajouté.");
-            refresh();
-        });
+        ctrl.creer(this, reparateurId,
+                data.nom, data.telephone, data.email, adresse, data.ville, imagePath,
+                created -> {
+                    UiDialogs.info(this, "Client ajouté.");
+                    refresh();
+                });
     }
 
     private void editClient() {
         Long id = getSelectedId();
         if (id == null) return;
 
-        // Pré-remplissage depuis la ligne JTable (simple)
         int row = table.getSelectedRow();
         String oldNom = safe(model.getValueAt(row, 1));
         String oldTel = safe(model.getValueAt(row, 2));
         String oldEmail = safe(model.getValueAt(row, 3));
         String oldVille = safe(model.getValueAt(row, 4));
 
-        String nom = ask("Nom*", oldNom);
-        if (nom == null) return;
+        ClientDialog dlg = new ClientDialog(SwingUtilities.getWindowAncestor(this));
+        dlg.setModeEdit(id, oldNom, oldTel, oldEmail, oldVille);
+        dlg.setVisible(true);
 
-        String tel = ask("Téléphone*", oldTel);
-        if (tel == null) return;
+        if (!dlg.isSaved()) return;
 
-        String email = ask("Email (optionnel)", oldEmail);
-        if (email == null) return;
+        ClientDialog.ClientFormData data = dlg.getFormData();
+        if (data == null) return;
 
-        // Adresse non visible dans table → on laisse vide (ou tu ajoutes une colonne)
-        String adresse = ask("Adresse (optionnel)", "");
-        if (adresse == null) return;
+        // Adresse + imagePath pas encore dans ton dialog => valeurs par défaut
+        String adresse = "";
+        String imagePath = "";
 
-        String ville = ask("Ville (optionnel)", oldVille);
-        if (ville == null) return;
-
-        String imagePath = ""; // plus tard
-
-        ctrl.modifier(this, id, nom, tel, email, adresse, ville, imagePath, () -> {
-            UiDialogs.info(this, "Client modifié.");
-            refresh();
-        });
+        ctrl.modifier(this, id,
+                data.nom, data.telephone, data.email, adresse, data.ville, imagePath,
+                () -> {
+                    UiDialogs.info(this, "Client modifié.");
+                    refresh();
+                });
     }
 
     private void deleteClient() {
@@ -226,7 +210,7 @@ public class ClientsPanel extends JPanel {
                 "Téléphone: " + tel + "\n" +
                 "Email: " + email + "\n" +
                 "Ville: " + ville + "\n\n" +
-                "(Plus tard: ouvrir une vraie page/detail + historique réparations.)",
+                "(Plus tard: ouvrir un vrai écran détail + historique réparations.)",
                 "Détail client",
                 JOptionPane.INFORMATION_MESSAGE
         );
@@ -245,18 +229,6 @@ public class ClientsPanel extends JPanel {
         } catch (Exception ex) {
             return null;
         }
-    }
-
-    private String ask(String label, String initial) {
-        return (String) JOptionPane.showInputDialog(
-                this,
-                label,
-                "Saisie",
-                JOptionPane.PLAIN_MESSAGE,
-                null,
-                null,
-                initial
-        );
     }
 
     private String safe(Object o) {
