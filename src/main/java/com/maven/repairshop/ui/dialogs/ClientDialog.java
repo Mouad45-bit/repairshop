@@ -14,12 +14,14 @@ public class ClientDialog extends JDialog {
         public final String nom;
         public final String telephone;
         public final String email;
+        public final String adresse;
         public final String ville;
 
-        public ClientFormData(String nom, String telephone, String email, String ville) {
+        public ClientFormData(String nom, String telephone, String email, String adresse, String ville) {
             this.nom = nom;
             this.telephone = telephone;
             this.email = email;
+            this.adresse = adresse;
             this.ville = ville;
         }
     }
@@ -27,6 +29,7 @@ public class ClientDialog extends JDialog {
     private JTextField txtNom;
     private JTextField txtTel;
     private JTextField txtEmail;
+    private JTextField txtAdresse;
     private JTextField txtVille;
 
     private boolean saved = false;
@@ -37,7 +40,7 @@ public class ClientDialog extends JDialog {
 
     public ClientDialog(Window owner) {
         super(owner, "Client", ModalityType.APPLICATION_MODAL);
-        setSize(420, 280);
+        setSize(460, 340);
         setLocationRelativeTo(owner);
         initUi();
         setModeCreate(); // par défaut
@@ -75,15 +78,16 @@ public class ClientDialog extends JDialog {
      * Mode édition : tu passes les valeurs (pré-remplissage)
      * (On ne charge pas depuis DB ici, c’est le Panel qui a déjà les infos.)
      */
-    public void setModeEdit(Long clientId, String nom, String tel, String email, String ville) {
+    public void setModeEdit(Long clientId, String nom, String tel, String email, String adresse, String ville) {
         this.mode = Mode.EDIT;
         this.clientId = clientId;
         setTitle("Modifier client #" + clientId);
 
-        txtNom.setText(nom != null ? nom : "");
-        txtTel.setText(tel != null ? tel : "");
-        txtEmail.setText(email != null ? email : "");
-        txtVille.setText(ville != null ? ville : "");
+        txtNom.setText(nvl(nom));
+        txtTel.setText(nvl(tel));
+        txtEmail.setText(nvl(email));
+        txtAdresse.setText(nvl(adresse));
+        txtVille.setText(nvl(ville));
 
         this.saved = false;
         this.formData = null;
@@ -100,11 +104,13 @@ public class ClientDialog extends JDialog {
         txtNom = new JTextField();
         txtTel = new JTextField();
         txtEmail = new JTextField();
+        txtAdresse = new JTextField();
         txtVille = new JTextField();
 
         form.add(row("Nom*", txtNom));
         form.add(row("Téléphone*", txtTel));
         form.add(row("Email", txtEmail));
+        form.add(row("Adresse", txtAdresse));
         form.add(row("Ville", txtVille));
 
         add(form, BorderLayout.CENTER);
@@ -123,12 +129,15 @@ public class ClientDialog extends JDialog {
         });
 
         btnSave.addActionListener(e -> onSave());
+
+        getRootPane().setDefaultButton(btnSave);
     }
 
     private void onSave() {
         String nom = txtNom.getText() != null ? txtNom.getText().trim() : "";
         String tel = txtTel.getText() != null ? txtTel.getText().trim() : "";
         String email = txtEmail.getText() != null ? txtEmail.getText().trim() : "";
+        String adresse = txtAdresse.getText() != null ? txtAdresse.getText().trim() : "";
         String ville = txtVille.getText() != null ? txtVille.getText().trim() : "";
 
         // Validations UI minimales (les vraies règles restent en service)
@@ -141,7 +150,7 @@ public class ClientDialog extends JDialog {
             return;
         }
 
-        this.formData = new ClientFormData(nom, tel, email, ville);
+        this.formData = new ClientFormData(nom, tel, email, adresse, ville);
         this.saved = true;
         dispose();
     }
@@ -150,6 +159,7 @@ public class ClientDialog extends JDialog {
         txtNom.setText("");
         txtTel.setText("");
         txtEmail.setText("");
+        txtAdresse.setText("");
         txtVille.setText("");
     }
 
@@ -159,5 +169,9 @@ public class ClientDialog extends JDialog {
         p.add(field, BorderLayout.CENTER);
         p.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 10));
         return p;
+    }
+
+    private static String nvl(String s) {
+        return s == null ? "" : s;
     }
 }
