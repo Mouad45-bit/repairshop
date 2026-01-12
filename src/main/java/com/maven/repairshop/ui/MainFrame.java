@@ -24,6 +24,8 @@ import com.maven.repairshop.ui.pages.ClientsPanel;
 import com.maven.repairshop.ui.pages.CaissePanel;
 import com.maven.repairshop.ui.pages.EmpruntsPanel;
 
+import com.maven.repairshop.ui.dialogs.SuiviDialog;
+
 /**
  * Fenêtre principale :
  * - Sidebar navigation
@@ -101,6 +103,7 @@ public class MainFrame extends JFrame {
 
         JButton btnDashboard = new JButton("Dashboard");
         JButton btnReparations = new JButton("Réparations");
+        JButton btnSuivi = new JButton("Suivi");
         JButton btnClients = new JButton("Clients");
         JButton btnCaisse = new JButton("Caisse");
         JButton btnEmprunts = new JButton("Emprunts / Prêts");
@@ -112,6 +115,7 @@ public class MainFrame extends JFrame {
         Dimension btnSize = new Dimension(190, 32);
         btnDashboard.setPreferredSize(btnSize);
         btnReparations.setPreferredSize(btnSize);
+        btnSuivi.setPreferredSize(btnSize);
         btnClients.setPreferredSize(btnSize);
         btnCaisse.setPreferredSize(btnSize);
         btnEmprunts.setPreferredSize(btnSize);
@@ -119,6 +123,7 @@ public class MainFrame extends JFrame {
 
         sidebar.add(btnDashboard);
         sidebar.add(btnReparations);
+        sidebar.add(btnSuivi);
         sidebar.add(btnClients);
         sidebar.add(btnCaisse);
         sidebar.add(btnEmprunts);
@@ -132,7 +137,6 @@ public class MainFrame extends JFrame {
         cardLayout = new CardLayout();
         contentPanel = new JPanel(cardLayout);
 
-        //
         contentPanel.add(new DashboardPanel(session), CARD_DASHBOARD);
         contentPanel.add(new ReparationsPanel(session), CARD_REPARATIONS);
         contentPanel.add(new ClientsPanel(session), CARD_CLIENTS);
@@ -148,11 +152,19 @@ public class MainFrame extends JFrame {
         btnCaisse.addActionListener(e -> showCard(CARD_CAISSE));
         btnEmprunts.addActionListener(e -> showCard(CARD_EMPRUNTS));
 
+        // Option A : Suivi dans un Dialog modal
+        btnSuivi.addActionListener(e -> openSuiviDialog());
+
         // Déconnexion
         btnLogout.addActionListener(e -> doLogout());
 
         // Par défaut
         showCard(CARD_DASHBOARD);
+    }
+
+    private void openSuiviDialog() {
+        SuiviDialog dlg = new SuiviDialog(this, session);
+        dlg.setVisible(true);
     }
 
     private void doLogout() {
