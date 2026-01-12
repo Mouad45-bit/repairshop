@@ -2,170 +2,234 @@ package com.maven.repairshop.ui.pages;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumn;
 
-import com.maven.repairshop.ui.dialogs.ReparationDetailDialog;
-import com.maven.repairshop.ui.dialogs.ReparationFormDialog;
+import com.maven.repairshop.model.Reparation;
+import com.maven.repairshop.model.enums.StatutReparation;
+import com.maven.repairshop.ui.controllers.ReparationController;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class ReparationsPanel extends JPanel {
 
     private final SessionContext session;
+    private final ReparationController controller = new ReparationController();
 
     private JTable table;
-    private DefaultTableModel model;
+    private DefaultTableModel tableModel;
 
-    private JTextField txtSearch;
-    private JComboBox<String> cbStatut;
+    private JTextField txtRecherche;
+    private JComboBox<Object> cbStatut;
+    private JButton btnRechercher;
+    private JButton btnActualiser;
+    private JButton btnChangerStatut;
+    private JButton btnAnnuler;
+
+    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public ReparationsPanel(SessionContext session) {
         this.session = session;
-        initUi();
-        // plus tard: refresh();
-    }
-
-    private void initUi() {
         setLayout(new BorderLayout());
 
-        // ===== Top bar (recherche + filtre + ajouter) =====
-        JPanel top = new JPanel(new BorderLayout());
+        initTopBar();
+        initTable();
+        initActionsBar();
 
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        txtSearch = new JTextField(18);
-        cbStatut = new JComboBox<>(new String[] {
-                "Tous", "ENREGISTREE", "EN_COURS", "EN_ATTENTE_PIECES", "TERMINEE", "LIVREE", "ANNULEE"
+        refresh(); // charge initial
+    }
+
+    // ---------------- UI ----------------
+
+    private void initTopBar() {
+        JPanel panelTop = new JPanel(new BorderLayout());
+
+        JPanel panelSearch = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        txtRecherche = new JTextField(16);
+
+        // "Tous" + enums
+        cbStatut = new JComboBox<>();
+        cbStatut.addItem("Tous");
+        for (StatutReparation s : StatutReparation.values()) {
+            cbStatut.addItem(s);
+        }
+
+        btnRechercher = new JButton("Rechercher");
+        btnActualiser = new JButton("Actualiser");
+
+        panelSearch.add(new JLabel("Recherche:"));
+        panelSearch.add(txtRecherche);
+        panelSearch.add(new JLabel("Statut:"));
+        panelSearch.add(cbStatut);
+        panelSearch.add(btnRechercher);
+        panelSearch.add(btnActualiser);
+
+        // events
+        btnRechercher.addActionListener(e -> refresh());
+        btnActualiser.addActionListener(e -> {
+            txtRecherche.setText("");
+            cbStatut.setSelectedIndex(0);
+            refresh();
         });
-        JButton btnSearch = new JButton("Rechercher");
-        JButton btnRefresh = new JButton("Actualiser");
+        cbStatut.addActionListener(e -> refresh());
 
-        left.add(new JLabel("Recherche:"));
-        left.add(txtSearch);
-        left.add(new JLabel("Statut:"));
-        left.add(cbStatut);
-        left.add(btnSearch);
-        left.add(btnRefresh);
+        txtRecherche.addKeyListener(new KeyAdapter() {
+            @Override public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) refresh();
+            }
+        });
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnAdd = new JButton("+ Ajouter");
-        right.add(btnAdd);
+        panelTop.add(panelSearch, BorderLayout.CENTER);
+        add(panelTop, BorderLayout.NORTH);
+    }
 
-        top.add(left, BorderLayout.CENTER);
-        top.add(right, BorderLayout.EAST);
-
-        add(top, BorderLayout.NORTH);
-
-        // ===== Table =====
-        model = new DefaultTableModel(
-                new Object[] { "ID", "Code", "Date", "Client", "Statut", "Avance", "Reste" }, 0
+    private void initTable() {
+        // Col 0 = ID caché (très important)
+        tableModel = new DefaultTableModel(
+                new Object[]{"ID", "Code", "Client", "Statut", "Dernier statut"},
+                0
         ) {
             @Override public boolean isCellEditable(int row, int col) { return false; }
         };
 
-        table = new JTable(model);
+        table = new JTable(tableModel);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        // cacher la colonne ID
+        TableColumn idCol = table.getColumnModel().getColumn(0);
+        idCol.setMinWidth(0);
+        idCol.setMaxWidth(0);
+        idCol.setPreferredWidth(0);
+
         add(new JScrollPane(table), BorderLayout.CENTER);
-
-        // Double-clic => détail
-        table.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    openDetailSelected();
-                }
-            }
-        });
-
-        // ===== Actions rapides =====
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnEdit = new JButton("Modifier");
-        JButton btnCancel = new JButton("Annuler réparation");
-        JButton btnDetail = new JButton("Voir détail");
-        bottom.add(btnEdit);
-        bottom.add(btnCancel);
-        bottom.add(btnDetail);
-
-        add(bottom, BorderLayout.SOUTH);
-
-        // ===== Events (UI-only pour l’instant) =====
-        btnAdd.addActionListener(e -> openFormCreate());
-        btnEdit.addActionListener(e -> openFormEditSelected());
-        btnDetail.addActionListener(e -> openDetailSelected());
-
-        btnCancel.addActionListener(e -> {
-            Long id = getSelectedId();
-            if (id == null) return;
-
-            int ok = JOptionPane.showConfirmDialog(this,
-                    "Confirmer l'annulation de la réparation sélectionnée ?",
-                    "Annuler réparation",
-                    JOptionPane.YES_NO_OPTION);
-
-            if (ok == JOptionPane.YES_OPTION) {
-                // plus tard: reparationService.annuler(id, session)
-                JOptionPane.showMessageDialog(this, "Annulation (à brancher service)");
-            }
-        });
-
-        btnSearch.addActionListener(e -> {
-            // plus tard: refresh() avec query + statut
-            JOptionPane.showMessageDialog(this, "Recherche (à brancher service)");
-        });
-
-        btnRefresh.addActionListener(e -> {
-            // plus tard: refresh()
-            JOptionPane.showMessageDialog(this, "Actualiser (à brancher service)");
-        });
-
-        // (Option) données fake pour voir l’UI tout de suite
-        seedFakeRows();
     }
 
-    private void openFormCreate() {
-        ReparationFormDialog dlg = new ReparationFormDialog(SwingUtilities.getWindowAncestor(this), session);
-        dlg.setVisible(true);
-        // plus tard: si dlg.isSaved() => refresh()
+    private void initActionsBar() {
+        JPanel panelActions = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        btnChangerStatut = new JButton("Changer statut");
+        btnAnnuler = new JButton("Annuler");
+
+        btnChangerStatut.addActionListener(e -> onChangerStatut());
+        btnAnnuler.addActionListener(e -> onAnnuler());
+
+        panelActions.add(btnChangerStatut);
+        panelActions.add(btnAnnuler);
+
+        add(panelActions, BorderLayout.SOUTH);
     }
 
-    private void openFormEditSelected() {
-        Long id = getSelectedId();
-        if (id == null) return;
+    // ---------------- Logic UI ----------------
 
-        ReparationFormDialog dlg = new ReparationFormDialog(SwingUtilities.getWindowAncestor(this), session);
-        dlg.setModeEdit(id); // UI-only
-        dlg.setVisible(true);
-        // plus tard: refresh()
+    private void refresh() {
+        String query = txtRecherche.getText();
+        Long reparateurId = currentReparateurId();
+        StatutReparation statut = selectedStatutOrNull();
+
+        controller.rechercher(this, query, reparateurId, statut, this::fillTable);
     }
 
-    private void openDetailSelected() {
-        Long id = getSelectedId();
-        if (id == null) return;
+    private void fillTable(List<Reparation> list) {
+        tableModel.setRowCount(0);
 
-        ReparationDetailDialog dlg = new ReparationDetailDialog(SwingUtilities.getWindowAncestor(this), session, id);
-        dlg.setVisible(true);
+        for (Reparation r : list) {
+            Long id = r.getId();
+            String code = r.getCodeUnique();
+            String client = (r.getClient() != null) ? safe(r.getClient().getNom()) : "";
+            StatutReparation st = r.getStatut();
+            String last = (r.getDateDernierStatut() != null) ? r.getDateDernierStatut().format(DT_FMT) : "";
+
+            tableModel.addRow(new Object[]{
+                    id,
+                    code,
+                    client,
+                    st,
+                    last
+            });
+        }
     }
 
-    private Long getSelectedId() {
-        int row = table.getSelectedRow();
-        if (row < 0) {
+    private void onChangerStatut() {
+        Long id = selectedId();
+        if (id == null) {
             JOptionPane.showMessageDialog(this, "Sélectionne une réparation d'abord.");
-            return null;
+            return;
         }
-        Object v = model.getValueAt(row, 0);
-        if (v == null) return null;
-        try {
-            return Long.valueOf(v.toString());
-        } catch (Exception ex) {
-            return null;
-        }
+
+        // statut actuel (depuis table)
+        Object stObj = table.getValueAt(table.getSelectedRow(), 3);
+        StatutReparation current = (stObj instanceof StatutReparation) ? (StatutReparation) stObj : null;
+
+        JComboBox<StatutReparation> cb = new JComboBox<>(StatutReparation.values());
+        if (current != null) cb.setSelectedItem(current);
+
+        int ok = JOptionPane.showConfirmDialog(
+                this,
+                cb,
+                "Nouveau statut",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+        );
+        if (ok != JOptionPane.OK_OPTION) return;
+
+        StatutReparation nouveau = (StatutReparation) cb.getSelectedItem();
+        if (nouveau == null) return;
+
+        controller.changerStatut(this, id, nouveau, this::refresh);
     }
 
-    private void seedFakeRows() {
-        model.setRowCount(0);
-        model.addRow(new Object[] { 1, "R-8F2A1", "2026-01-12", "Sara B.", "EN_COURS", "100", "200" });
-        model.addRow(new Object[] { 2, "R-91BC0", "2026-01-10", "Amine K.", "TERMINEE", "150", "0" });
-        model.addRow(new Object[] { 3, "R-003X9", "2026-01-08", "Nadia L.", "EN_ATTENTE_PIECES", "0", "400" });
+    private void onAnnuler() {
+        Long id = selectedId();
+        if (id == null) {
+            JOptionPane.showMessageDialog(this, "Sélectionne une réparation d'abord.");
+            return;
+        }
+
+        int ok = JOptionPane.showConfirmDialog(
+                this,
+                "Confirmer l'annulation ?",
+                "Annuler réparation",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (ok != JOptionPane.YES_OPTION) return;
+
+        controller.changerStatut(this, id, StatutReparation.ANNULEE, this::refresh);
+    }
+
+    // ---------------- Helpers ----------------
+
+    private Long selectedId() {
+        int row = table.getSelectedRow();
+        if (row < 0) return null;
+
+        Object v = table.getValueAt(row, 0); // colonne ID cachée
+        if (v instanceof Long) return (Long) v;
+        if (v instanceof Number) return ((Number) v).longValue();
+        return null;
+    }
+
+    private StatutReparation selectedStatutOrNull() {
+        Object s = cbStatut.getSelectedItem();
+        if (s instanceof StatutReparation) return (StatutReparation) s;
+        return null; // "Tous"
+    }
+
+    private Long currentReparateurId() {
+        // Adapte si ton SessionContext expose différemment
+        try {
+            // Exemples possibles: session.getUser().getId() ou session.getCurrentUser().getId()
+            var user = session.getUser();
+            if (user != null) return user.getId();
+        } catch (Exception ignored) {}
+        return null; // si null => le mock peut retourner tout
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 }
