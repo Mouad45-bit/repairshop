@@ -12,10 +12,9 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 
 import com.maven.repairshop.model.Client;
-import com.maven.repairshop.service.ClientService;
 import com.maven.repairshop.ui.controllers.ClientController;
 import com.maven.repairshop.ui.session.SessionContext;
-import com.maven.repairshop.ui.util.ServiceRegistry;
+import com.maven.repairshop.ui.util.UiServices;
 
 public class ClientPickerDialog extends JDialog {
 
@@ -42,38 +41,13 @@ public class ClientPickerDialog extends JDialog {
         super(owner, "Choisir un client", ModalityType.APPLICATION_MODAL);
         this.session = session;
 
-        /**
-         * IMPORTANT (UI-only) :
-         * Ton ServiceRegistry actuel ne contient PAS encore ClientService (seulement EmpruntService).
-         * Donc ici, tu as 2 choix :
-         *
-         * 1) (RECOMMANDÉ) : ajouter ClientService dans ServiceRegistry (sans casser l'UI)
-         *    -> puis remplacer "clientService = ..." par "ServiceRegistry.get().clientService()"
-         *
-         * 2) (TEMPORAIRE) : passer directement un ClientService mock/impl depuis l'endroit qui ouvre le dialog.
-         *
-         * Ici, je garde un code QUI COMPILE, en attendant que tu ajoutes ClientService au registry :
-         */
-        ClientService clientService = getClientServiceOrThrow();
-        this.controller = new ClientController(clientService);
+        // UI-only : via UiServices (mock today / real impl later)
+        this.controller = new ClientController(UiServices.get().clients());
 
         setSize(760, 440);
         setLocationRelativeTo(owner);
         initUi();
         refresh();
-    }
-
-    /** UI-only : si ClientService n'est pas encore câblé dans ServiceRegistry, on explique clairement. */
-    private ClientService getClientServiceOrThrow() {
-        // Quand tu ajoutes ClientService au ServiceRegistry, remplace tout le contenu par :
-        // return ServiceRegistry.get().clientService();
-
-        // Pour l'instant, ServiceRegistry n'a pas ClientService => on ne peut pas le récupérer.
-        throw new IllegalStateException(
-                "ClientService n'est pas encore câblé dans ServiceRegistry.\n\n" +
-                "Solution: ajoute dans ServiceRegistry un champ ClientService + getter clientService().\n" +
-                "Ensuite, dans ClientPickerDialog, remplace getClientServiceOrThrow() par ServiceRegistry.get().clientService()."
-        );
     }
 
     public boolean isSelected() {
@@ -111,8 +85,7 @@ public class ClientPickerDialog extends JDialog {
         });
 
         txtRecherche.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
+            @Override public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) refresh();
             }
         });
@@ -121,7 +94,7 @@ public class ClientPickerDialog extends JDialog {
 
         // Table
         tableModel = new DefaultTableModel(
-                new Object[]{"ID", "Nom", "Téléphone", "Ville"},
+                new Object[]{"ID", "Nom", "Téléphone", "Email", "Ville"},
                 0
         ) {
             @Override public boolean isCellEditable(int row, int col) { return false; }
@@ -164,12 +137,11 @@ public class ClientPickerDialog extends JDialog {
     private void refresh() {
         Long reparateurId = currentReparateurId();
         String q = txtRecherche.getText();
+        if (q == null) q = "";
+        q = q.trim();
 
-        if (q == null || q.trim().isEmpty()) {
-            controller.lister(this, reparateurId, this::fillTable);
-        } else {
-            controller.rechercher(this, reparateurId, q, this::fillTable);
-        }
+        // Pas de "lister" dans le contract => rechercher("") doit retourner tous
+        controller.rechercher(this, q, reparateurId, this::fillTable);
     }
 
     private void fillTable(List<Client> list) {
@@ -179,6 +151,7 @@ public class ClientPickerDialog extends JDialog {
                     c.getId(),
                     safe(c.getNom()),
                     safe(c.getTelephone()),
+                    safe(c.getEmail()),
                     safe(c.getVille())
             });
         }
@@ -201,7 +174,8 @@ public class ClientPickerDialog extends JDialog {
         try {
             c.setNom((String) table.getValueAt(row, 1));
             c.setTelephone((String) table.getValueAt(row, 2));
-            c.setVille((String) table.getValueAt(row, 3));
+            c.setEmail((String) table.getValueAt(row, 3));
+            c.setVille((String) table.getValueAt(row, 4));
         } catch (Exception ignored) {}
 
         this.picked = c;
@@ -221,9 +195,17 @@ public class ClientPickerDialog extends JDialog {
 
     private Long currentReparateurId() {
         try {
+            // Chez toi tu utilises déjà session.getReparateurId() dans ClientsPanel
+            Long id = session.getReparateurId();
+            if (id != null) return id;
+        } catch (Exception ignored) {}
+
+        // fallback possible si session expose user
+        try {
             var user = session.getUser();
             if (user != null) return user.getId();
         } catch (Exception ignored) {}
+
         return null;
     }
 
