@@ -15,7 +15,7 @@ public class EmpruntDialog extends JDialog {
         public final String personne;
         public final String montantStr;
         public final String dateStr;  // YYYY-MM-DD (UI)
-        public final String statut;   // "EN_COURS" | "PARTIEL" | "REMBOURSE"
+        public final String statut;   // "EN_COURS" | "PARTIELLEMENT_REMBOURSE" | "REMBOURSE"
         public final String remarque;
 
         public EmpruntFormData(String type, String personne, String montantStr, String dateStr, String statut, String remarque) {
@@ -36,7 +36,7 @@ public class EmpruntDialog extends JDialog {
     private JComboBox<String> cbType;
     private JTextField txtPersonne;
     private JTextField txtMontant;
-    private JTextField txtDate; // YYYY-MM-DD
+    private JTextField txtDate; // YYYY-MM-DD (UI)
     private JComboBox<String> cbStatut;
     private JTextArea txtRemarque;
 
@@ -48,14 +48,9 @@ public class EmpruntDialog extends JDialog {
         setModeCreate();
     }
 
-    // ===== API utilisée par EmpruntsPanel =====
-
     public boolean isSaved() { return saved; }
-
     public Mode getMode() { return mode; }
-
     public Long getEditId() { return editId; }
-
     public EmpruntFormData getFormData() { return formData; }
 
     public void setModeCreate() {
@@ -66,10 +61,10 @@ public class EmpruntDialog extends JDialog {
         setTitle("Ajouter emprunt / prêt");
 
         cbType.setSelectedIndex(0);
-        cbStatut.setSelectedIndex(0);
+        cbStatut.setSelectedItem("EN_COURS");
         txtPersonne.setText("");
         txtMontant.setText("");
-        txtDate.setText("2026-01-12");
+        txtDate.setText(""); // optionnel UI
         txtRemarque.setText("");
     }
 
@@ -85,11 +80,9 @@ public class EmpruntDialog extends JDialog {
 
         txtPersonne.setText(personne != null ? personne : "");
         txtMontant.setText(montant != null ? montant : "");
-        txtDate.setText(date != null ? date : "2026-01-12");
+        txtDate.setText(date != null ? date : "");
         txtRemarque.setText(remarque != null ? remarque : "");
     }
-
-    // ===== UI =====
 
     private void initUi() {
         setLayout(new BorderLayout());
@@ -100,8 +93,8 @@ public class EmpruntDialog extends JDialog {
         cbType = new JComboBox<>(new String[] { "EMPRUNT", "PRET" });
         txtPersonne = new JTextField();
         txtMontant = new JTextField();
-        txtDate = new JTextField("2026-01-12");
-        cbStatut = new JComboBox<>(new String[] { "EN_COURS", "PARTIEL", "REMBOURSE" });
+        txtDate = new JTextField(); // UI-only
+        cbStatut = new JComboBox<>(new String[] { "EN_COURS", "PARTIELLEMENT_REMBOURSE", "REMBOURSE" });
 
         txtRemarque = new JTextArea(5, 20);
         txtRemarque.setLineWrap(true);
@@ -110,12 +103,12 @@ public class EmpruntDialog extends JDialog {
         form.add(row("Type*", cbType));
         form.add(row("Personne*", txtPersonne));
         form.add(row("Montant (DH)*", txtMontant));
-        form.add(row("Date (YYYY-MM-DD)*", txtDate));
+        form.add(row("Date (YYYY-MM-DD) (UI)", txtDate));
         form.add(row("Statut*", cbStatut));
 
         JPanel rem = new JPanel(new BorderLayout(8, 8));
         rem.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
-        rem.add(new JLabel("Remarque (optionnel)"), BorderLayout.NORTH);
+        rem.add(new JLabel("Remarque / Motif (optionnel)"), BorderLayout.NORTH);
         rem.add(new JScrollPane(txtRemarque), BorderLayout.CENTER);
         form.add(rem);
 
@@ -135,6 +128,8 @@ public class EmpruntDialog extends JDialog {
         });
 
         btnSave.addActionListener(e -> onSave());
+
+        getRootPane().setDefaultButton(btnSave);
     }
 
     private void onSave() {
@@ -146,7 +141,6 @@ public class EmpruntDialog extends JDialog {
         String date = txtDate.getText() != null ? txtDate.getText().trim() : "";
         String remarque = txtRemarque.getText() != null ? txtRemarque.getText().trim() : "";
 
-        // Validations UI minimales (le vrai contrôle est en Service)
         if (personne.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Personne obligatoire.");
             return;
@@ -155,7 +149,7 @@ public class EmpruntDialog extends JDialog {
             JOptionPane.showMessageDialog(this, "Montant obligatoire.");
             return;
         }
-        // Autoriser virgule
+
         String m = montantStr.replace(",", ".");
         double montant;
         try {
@@ -166,10 +160,6 @@ public class EmpruntDialog extends JDialog {
         }
         if (montant <= 0) {
             JOptionPane.showMessageDialog(this, "Le montant doit être > 0.");
-            return;
-        }
-        if (date.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Date obligatoire.");
             return;
         }
 
