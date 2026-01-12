@@ -2,6 +2,7 @@ package com.maven.repairshop.ui.pages;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.awt.Window;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.time.format.DateTimeFormatter;
@@ -14,6 +15,7 @@ import javax.swing.table.TableColumn;
 import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.model.enums.StatutReparation;
 import com.maven.repairshop.ui.controllers.ReparationController;
+import com.maven.repairshop.ui.dialogs.ReparationDetailDialog;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class ReparationsPanel extends JPanel {
@@ -28,6 +30,8 @@ public class ReparationsPanel extends JPanel {
     private JComboBox<Object> cbStatut;
     private JButton btnRechercher;
     private JButton btnActualiser;
+
+    private JButton btnDetail;
     private JButton btnChangerStatut;
     private JButton btnAnnuler;
 
@@ -79,7 +83,8 @@ public class ReparationsPanel extends JPanel {
         cbStatut.addActionListener(e -> refresh());
 
         txtRecherche.addKeyListener(new KeyAdapter() {
-            @Override public void keyPressed(KeyEvent e) {
+            @Override
+            public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) refresh();
             }
         });
@@ -94,7 +99,10 @@ public class ReparationsPanel extends JPanel {
                 new Object[]{"ID", "Code", "Client", "Statut", "Dernier statut"},
                 0
         ) {
-            @Override public boolean isCellEditable(int row, int col) { return false; }
+            @Override
+            public boolean isCellEditable(int row, int col) {
+                return false;
+            }
         };
 
         table = new JTable(tableModel);
@@ -112,12 +120,16 @@ public class ReparationsPanel extends JPanel {
     private void initActionsBar() {
         JPanel panelActions = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
+        btnDetail = new JButton("Détail");
         btnChangerStatut = new JButton("Changer statut");
         btnAnnuler = new JButton("Annuler");
 
+        btnDetail.addActionListener(e -> onDetail());
         btnChangerStatut.addActionListener(e -> onChangerStatut());
         btnAnnuler.addActionListener(e -> onAnnuler());
 
+        // Ordre conseillé : Détail, Changer statut, Annuler
+        panelActions.add(btnDetail);
         panelActions.add(btnChangerStatut);
         panelActions.add(btnAnnuler);
 
@@ -152,6 +164,17 @@ public class ReparationsPanel extends JPanel {
                     last
             });
         }
+    }
+
+    private void onDetail() {
+        Long id = selectedId();
+        if (id == null) {
+            JOptionPane.showMessageDialog(this, "Sélectionne une réparation d'abord.");
+            return;
+        }
+
+        Window w = SwingUtilities.getWindowAncestor(this);
+        new ReparationDetailDialog(w, session, id).setVisible(true);
     }
 
     private void onChangerStatut() {
@@ -225,7 +248,8 @@ public class ReparationsPanel extends JPanel {
             // Exemples possibles: session.getUser().getId() ou session.getCurrentUser().getId()
             var user = session.getUser();
             if (user != null) return user.getId();
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return null; // si null => le mock peut retourner tout
     }
 
