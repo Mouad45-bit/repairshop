@@ -40,7 +40,7 @@ public class ClientPickerDialog extends JDialog {
         super(owner, "Choisir un client", ModalityType.APPLICATION_MODAL);
         this.session = session;
 
-        // ⚠️ UI only : on récupère l'interface via ServiceRegistry
+        // UI only : on récupère l'interface via ServiceRegistry
         // Adapte si ton getter s'appelle autrement
         ClientService clientService = ServiceRegistry.get().clientService();
         this.controller = new ClientController(clientService);
