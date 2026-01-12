@@ -6,41 +6,90 @@ import java.awt.Window;
 
 import javax.swing.*;
 
-import com.maven.repairshop.ui.session.SessionContext;
-
 public class EmpruntDialog extends JDialog {
 
-    private final SessionContext session;
+    public enum Mode { CREATE, EDIT }
+
+    public static final class EmpruntFormData {
+        public final String type;     // "EMPRUNT" | "PRET"
+        public final String personne;
+        public final String montantStr;
+        public final String dateStr;  // YYYY-MM-DD (UI)
+        public final String statut;   // "EN_COURS" | "PARTIEL" | "REMBOURSE"
+        public final String remarque;
+
+        public EmpruntFormData(String type, String personne, String montantStr, String dateStr, String statut, String remarque) {
+            this.type = type;
+            this.personne = personne;
+            this.montantStr = montantStr;
+            this.dateStr = dateStr;
+            this.statut = statut;
+            this.remarque = remarque;
+        }
+    }
 
     private boolean saved = false;
+    private Mode mode = Mode.CREATE;
     private Long editId = null;
+    private EmpruntFormData formData = null;
 
     private JComboBox<String> cbType;
     private JTextField txtPersonne;
     private JTextField txtMontant;
-    private JTextField txtDate; // simple texte (YYYY-MM-DD) pour l’instant
+    private JTextField txtDate; // YYYY-MM-DD
     private JComboBox<String> cbStatut;
     private JTextArea txtRemarque;
 
-    public EmpruntDialog(Window owner, SessionContext session) {
+    public EmpruntDialog(Window owner) {
         super(owner, "Emprunt / Prêt", ModalityType.APPLICATION_MODAL);
-        this.session = session;
-
         setSize(520, 420);
         setLocationRelativeTo(owner);
         initUi();
+        setModeCreate();
     }
 
-    public boolean isSaved() {
-        return saved;
+    // ===== API utilisée par EmpruntsPanel =====
+
+    public boolean isSaved() { return saved; }
+
+    public Mode getMode() { return mode; }
+
+    public Long getEditId() { return editId; }
+
+    public EmpruntFormData getFormData() { return formData; }
+
+    public void setModeCreate() {
+        this.mode = Mode.CREATE;
+        this.editId = null;
+        this.saved = false;
+        this.formData = null;
+        setTitle("Ajouter emprunt / prêt");
+
+        cbType.setSelectedIndex(0);
+        cbStatut.setSelectedIndex(0);
+        txtPersonne.setText("");
+        txtMontant.setText("");
+        txtDate.setText("2026-01-12");
+        txtRemarque.setText("");
     }
 
-    /** Mode édition (UI-only). Plus tard on charge depuis service. */
-    public void setModeEdit(Long id) {
+    public void setModeEdit(Long id, String type, String personne, String montant, String date, String statut, String remarque) {
+        this.mode = Mode.EDIT;
         this.editId = id;
+        this.saved = false;
+        this.formData = null;
         setTitle("Modifier emprunt/prêt #" + id);
-        // plus tard: loadFromService(id)
+
+        cbType.setSelectedItem(type != null ? type : "EMPRUNT");
+        cbStatut.setSelectedItem(statut != null ? statut : "EN_COURS");
+
+        txtPersonne.setText(personne != null ? personne : "");
+        txtMontant.setText(montant != null ? montant : "");
+        txtDate.setText(date != null ? date : "2026-01-12");
+        txtRemarque.setText(remarque != null ? remarque : "");
     }
+
+    // ===== UI =====
 
     private void initUi() {
         setLayout(new BorderLayout());
@@ -70,10 +119,6 @@ public class EmpruntDialog extends JDialog {
         rem.add(new JScrollPane(txtRemarque), BorderLayout.CENTER);
         form.add(rem);
 
-        JLabel hint = new JLabel("Règle métier: montant > 0, personne obligatoire, et accès limité au réparateur/boutique.");
-        hint.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
-        form.add(hint);
-
         add(form, BorderLayout.CENTER);
 
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -83,15 +128,25 @@ public class EmpruntDialog extends JDialog {
         bottom.add(btnSave);
         add(bottom, BorderLayout.SOUTH);
 
-        btnCancel.addActionListener(e -> dispose());
+        btnCancel.addActionListener(e -> {
+            saved = false;
+            formData = null;
+            dispose();
+        });
+
         btnSave.addActionListener(e -> onSave());
     }
 
     private void onSave() {
+        String type = cbType.getSelectedItem() != null ? cbType.getSelectedItem().toString() : "EMPRUNT";
+        String statut = cbStatut.getSelectedItem() != null ? cbStatut.getSelectedItem().toString() : "EN_COURS";
+
         String personne = txtPersonne.getText() != null ? txtPersonne.getText().trim() : "";
         String montantStr = txtMontant.getText() != null ? txtMontant.getText().trim() : "";
         String date = txtDate.getText() != null ? txtDate.getText().trim() : "";
+        String remarque = txtRemarque.getText() != null ? txtRemarque.getText().trim() : "";
 
+        // Validations UI minimales (le vrai contrôle est en Service)
         if (personne.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Personne obligatoire.");
             return;
@@ -100,9 +155,11 @@ public class EmpruntDialog extends JDialog {
             JOptionPane.showMessageDialog(this, "Montant obligatoire.");
             return;
         }
+        // Autoriser virgule
+        String m = montantStr.replace(",", ".");
         double montant;
         try {
-            montant = Double.parseDouble(montantStr);
+            montant = Double.parseDouble(m);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Montant invalide.");
             return;
@@ -116,13 +173,8 @@ public class EmpruntDialog extends JDialog {
             return;
         }
 
-        // Ici plus tard:
-        // empruntService.creer(...) ou modifier(...)
-        // + règles service: sécurité boutique, transitions statut, etc.
-        JOptionPane.showMessageDialog(this,
-                (editId == null ? "Création (à brancher service)" : "Modification (à brancher service)"));
-
-        saved = true;
+        this.formData = new EmpruntFormData(type, personne, montantStr, date, statut, remarque);
+        this.saved = true;
         dispose();
     }
 
