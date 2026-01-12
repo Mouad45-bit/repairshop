@@ -3,11 +3,20 @@ package com.maven.repairshop.ui.pages;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
+import com.maven.repairshop.model.Emprunt;
+import com.maven.repairshop.model.enums.TypeEmprunt;
+import com.maven.repairshop.ui.controllers.UiAsync;
+import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.session.SessionContext;
+import com.maven.repairshop.ui.util.UiServices;
 
 public class CaissePanel extends JPanel {
 
@@ -23,10 +32,12 @@ public class CaissePanel extends JPanel {
     private JLabel lblSorties;
     private JLabel lblSolde;
 
+    private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
     public CaissePanel(SessionContext session) {
         this.session = session;
         initUi();
-        // plus tard: refresh();
+        refresh();
     }
 
     private void initUi() {
@@ -49,15 +60,7 @@ public class CaissePanel extends JPanel {
         left.add(btnApply);
         left.add(btnReset);
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnExportPdf = new JButton("Exporter PDF");
-        JButton btnExportCsv = new JButton("Exporter CSV");
-        right.add(btnExportPdf);
-        right.add(btnExportCsv);
-
         top.add(left, BorderLayout.CENTER);
-        top.add(right, BorderLayout.EAST);
-
         add(top, BorderLayout.NORTH);
 
         // ===== TABLE : mouvements =====
@@ -88,40 +91,92 @@ public class CaissePanel extends JPanel {
 
         add(bottom, BorderLayout.SOUTH);
 
-        // ===== EVENTS (UI only pour l’instant) =====
-        btnApply.addActionListener(e -> {
-            // plus tard: caisseService.getMouvements(from,to,session)
-            JOptionPane.showMessageDialog(this, "Filtre période (à brancher service)");
-        });
+        // ===== EVENTS =====
+        btnApply.addActionListener(e -> refresh());
 
         btnReset.addActionListener(e -> {
             txtDateDebut.setText("");
             txtDateFin.setText("");
-            // plus tard: refresh()
+            refresh();
         });
 
-        btnExportPdf.addActionListener(e ->
-                JOptionPane.showMessageDialog(this, "Export PDF (à implémenter plus tard)")
-        );
-        btnExportCsv.addActionListener(e ->
-                JOptionPane.showMessageDialog(this, "Export CSV (à implémenter plus tard)")
-        );
-
-        // Données fake pour voir l’UI directement
-        seedFakeRows();
+        txtDateDebut.addActionListener(e -> refresh());
+        txtDateFin.addActionListener(e -> refresh());
     }
 
-    private void seedFakeRows() {
+    private void refresh() {
+        Long reparateurId = session.getReparateurId();
+        if (reparateurId == null) {
+            UiDialogs.warn(this, "Cette page est réservée au réparateur (session invalide).");
+            return;
+        }
+
+        LocalDate from = parseDateOrNull(txtDateDebut.getText());
+        LocalDate to = parseDateOrNull(txtDateFin.getText());
+
+        UiAsync.run(this,
+                () -> UiServices.get().emprunts().lister(reparateurId),
+                list -> fillFromEmprunts(list, from, to)
+        );
+    }
+
+    private void fillFromEmprunts(List<Emprunt> list, LocalDate from, LocalDate to) {
         model.setRowCount(0);
 
-        // Type: ENTREE/SORTIE, Catégorie: REPARATION/EMPRUNT/PRET/AUTRE
-        model.addRow(new Object[] { "2026-01-12", "ENTREE", "REPARATION", "Avance réparation R-8F2A1", "+100" });
-        model.addRow(new Object[] { "2026-01-10", "ENTREE", "REPARATION", "Solde réparation R-91BC0", "+150" });
-        model.addRow(new Object[] { "2026-01-09", "SORTIE", "AUTRE", "Achat pièces", "-60" });
+        double entrees = 0;
+        double sorties = 0;
 
-        // Totaux fake
-        lblEntrees.setText("Total entrées: 250 DH");
-        lblSorties.setText("Total sorties: 60 DH");
-        lblSolde.setText("Solde: 190 DH");
+        for (Emprunt e : list) {
+            LocalDateTime dt = e.getDateEmprunt();
+            LocalDate d = (dt != null) ? dt.toLocalDate() : null;
+
+            if (d != null) {
+                if (from != null && d.isBefore(from)) continue;
+                if (to != null && d.isAfter(to)) continue;
+            }
+
+            boolean isEntree = (e.getType() == TypeEmprunt.EMPRUNT); // tu reçois de l'argent
+            String type = isEntree ? "ENTREE" : "SORTIE";
+            String categorie = e.getType() != null ? e.getType().name() : "—";
+
+            String dateStr = (dt != null) ? dt.format(DT) : "";
+            String desc = (isEntree ? "Emprunt de " : "Prêt à ") + safe(e.getNomPersonne());
+            if (!safe(e.getMotif()).isEmpty()) desc += " — " + safe(e.getMotif());
+
+            double montant = e.getMontant();
+            String montantStr = (isEntree ? "+" : "-") + formatDh(Math.abs(montant));
+
+            model.addRow(new Object[] { dateStr, type, categorie, desc, montantStr });
+
+            if (isEntree) entrees += montant;
+            else sorties += montant;
+        }
+
+        double solde = entrees - sorties;
+
+        lblEntrees.setText("Total entrées: " + formatDh(entrees));
+        lblSorties.setText("Total sorties: " + formatDh(sorties));
+        lblSolde.setText("Solde: " + formatDh(solde));
+    }
+
+    private LocalDate parseDateOrNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        if (t.isEmpty()) return null;
+        try {
+            return LocalDate.parse(t); // ISO yyyy-MM-dd
+        } catch (Exception ex) {
+            UiDialogs.warn(this, "Date invalide: " + t + " (format attendu: YYYY-MM-DD)");
+            return null;
+        }
+    }
+
+    private String formatDh(double v) {
+        if (v == (long) v) return ((long) v) + " DH";
+        return String.format("%.2f DH", v);
+    }
+
+    private String safe(String s) {
+        return s == null ? "" : s.trim();
     }
 }
