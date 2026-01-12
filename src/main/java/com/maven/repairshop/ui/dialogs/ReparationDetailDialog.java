@@ -4,155 +4,106 @@ import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.Window;
+import java.time.format.DateTimeFormatter;
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 
+import com.maven.repairshop.model.Reparation;
+import com.maven.repairshop.ui.controllers.ReparationController;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class ReparationDetailDialog extends JDialog {
 
     private final SessionContext session;
+    private final ReparationController controller = new ReparationController();
+
     private final Long reparationId;
 
-    // UI fields
+    private JLabel lblId;
     private JLabel lblCode;
-    private JLabel lblStatut;
-    private JLabel lblDate;
     private JLabel lblClient;
+    private JLabel lblTelephone;
+    private JLabel lblStatut;
+    private JLabel lblDernierStatut;
 
-    private JTable tblAppareils;
-    private DefaultTableModel mdlAppareils;
+    private JButton btnFermer;
 
-    private JTable tblPaiements;
-    private DefaultTableModel mdlPaiements;
-
-    private JLabel lblTotal;
-    private JLabel lblDejaPaye;
-    private JLabel lblReste;
-
-    private JTextField txtMontant;
-    private JComboBox<String> cbTypePaiement;
+    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public ReparationDetailDialog(Window owner, SessionContext session, Long reparationId) {
-        super(owner, "Détail réparation #" + reparationId, ModalityType.APPLICATION_MODAL);
+        super(owner, "Détail réparation", ModalityType.APPLICATION_MODAL);
         this.session = session;
         this.reparationId = reparationId;
 
-        setSize(900, 600);
+        setSize(560, 320);
         setLocationRelativeTo(owner);
         initUi();
-
-        // plus tard: loadFromService(reparationId)
-        seedFakeDetails();
+        loadData();
     }
 
     private void initUi() {
         setLayout(new BorderLayout());
 
-        // ===== Header infos =====
-        JPanel header = new JPanel(new GridLayout(2, 2, 8, 8));
-        header.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        JPanel center = new JPanel(new GridLayout(6, 2, 10, 10));
+        center.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
 
-        lblCode = new JLabel("Code: —");
-        lblStatut = new JLabel("Statut: —");
-        lblDate = new JLabel("Date: —");
-        lblClient = new JLabel("Client: —");
+        center.add(new JLabel("ID:"));
+        lblId = new JLabel("-");
+        center.add(lblId);
 
-        header.add(lblCode);
-        header.add(lblStatut);
-        header.add(lblDate);
-        header.add(lblClient);
+        center.add(new JLabel("Code unique:"));
+        lblCode = new JLabel("-");
+        center.add(lblCode);
 
-        add(header, BorderLayout.NORTH);
+        center.add(new JLabel("Client:"));
+        lblClient = new JLabel("-");
+        center.add(lblClient);
 
-        // ===== Center: appareils + paiements =====
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-        split.setResizeWeight(0.55);
+        center.add(new JLabel("Téléphone:"));
+        lblTelephone = new JLabel("-");
+        center.add(lblTelephone);
 
-        // Appareils
-        mdlAppareils = new DefaultTableModel(new Object[] {"Type", "IMEI", "Remarque"}, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
-        tblAppareils = new JTable(mdlAppareils);
-        JPanel appareilsBox = new JPanel(new BorderLayout());
-        appareilsBox.add(new JLabel("Appareil(s)"), BorderLayout.NORTH);
-        appareilsBox.add(new JScrollPane(tblAppareils), BorderLayout.CENTER);
+        center.add(new JLabel("Statut:"));
+        lblStatut = new JLabel("-");
+        center.add(lblStatut);
 
-        // Paiements
-        mdlPaiements = new DefaultTableModel(new Object[] {"Date", "Montant", "Type"}, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
-        tblPaiements = new JTable(mdlPaiements);
+        center.add(new JLabel("Dernière mise à jour:"));
+        lblDernierStatut = new JLabel("-");
+        center.add(lblDernierStatut);
 
-        JPanel paiementsBox = new JPanel(new BorderLayout());
-        paiementsBox.add(new JLabel("Paiement(s)"), BorderLayout.NORTH);
-        paiementsBox.add(new JScrollPane(tblPaiements), BorderLayout.CENTER);
+        add(center, BorderLayout.CENTER);
 
-        split.setTopComponent(appareilsBox);
-        split.setBottomComponent(paiementsBox);
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnFermer = new JButton("Fermer");
+        btnFermer.addActionListener(e -> dispose());
+        bottom.add(btnFermer);
 
-        add(split, BorderLayout.CENTER);
-
-        // ===== Bottom: résumé + encaissement =====
-        JPanel bottom = new JPanel(new BorderLayout());
-
-        JPanel resume = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        lblTotal = new JLabel("Total: —");
-        lblDejaPaye = new JLabel("Déjà payé: —");
-        lblReste = new JLabel("Reste: —");
-        resume.add(lblTotal);
-        resume.add(new JLabel(" | "));
-        resume.add(lblDejaPaye);
-        resume.add(new JLabel(" | "));
-        resume.add(lblReste);
-
-        bottom.add(resume, BorderLayout.NORTH);
-
-        JPanel payRow = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        txtMontant = new JTextField(10);
-        cbTypePaiement = new JComboBox<>(new String[] { "AVANCE", "RESTE" });
-        JButton btnEncaisser = new JButton("Encaisser");
-        JButton btnClose = new JButton("Fermer");
-
-        payRow.add(new JLabel("Montant:"));
-        payRow.add(txtMontant);
-        payRow.add(new JLabel("Type:"));
-        payRow.add(cbTypePaiement);
-        payRow.add(btnEncaisser);
-        payRow.add(btnClose);
-
-        bottom.add(payRow, BorderLayout.SOUTH);
         add(bottom, BorderLayout.SOUTH);
-
-        btnClose.addActionListener(e -> dispose());
-
-        btnEncaisser.addActionListener(e -> {
-            String s = txtMontant.getText() != null ? txtMontant.getText().trim() : "";
-            if (s.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Montant obligatoire.");
-                return;
-            }
-            // plus tard: paiementService.enregistrerPaiement(reparationId, montant, type, session)
-            JOptionPane.showMessageDialog(this, "Encaissement (à brancher service)");
-        });
     }
 
-    // ===== Données fake pour voir l'UI immédiatement =====
-    private void seedFakeDetails() {
-        lblCode.setText("Code: R-8F2A1");
-        lblStatut.setText("Statut: EN_COURS");
-        lblDate.setText("Date: 2026-01-12");
-        lblClient.setText("Client: Sara B. (06xxxxxxxx)");
+    private void loadData() {
+        controller.trouverParId(this, reparationId, this::fill);
+    }
 
-        mdlAppareils.setRowCount(0);
-        mdlAppareils.addRow(new Object[] {"Téléphone", "356789012345678", "Écran cassé"});
+    private void fill(Reparation r) {
+        lblId.setText(r.getId() != null ? String.valueOf(r.getId()) : "-");
+        lblCode.setText(safe(r.getCodeUnique()));
 
-        mdlPaiements.setRowCount(0);
-        mdlPaiements.addRow(new Object[] {"2026-01-12", "100", "AVANCE"});
+        if (r.getClient() != null) {
+            lblClient.setText(safe(r.getClient().getNom()));
+            lblTelephone.setText(safe(r.getClient().getTelephone()));
+        } else {
+            lblClient.setText("");
+            lblTelephone.setText("");
+        }
 
-        lblTotal.setText("Total: 300 DH");
-        lblDejaPaye.setText("Déjà payé: 100 DH");
-        lblReste.setText("Reste: 200 DH");
+        lblStatut.setText(r.getStatut() != null ? r.getStatut().name() : "");
+        lblDernierStatut.setText(
+                r.getDateDernierStatut() != null ? r.getDateDernierStatut().format(DT_FMT) : ""
+        );
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 }
