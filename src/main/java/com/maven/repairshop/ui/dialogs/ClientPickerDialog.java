@@ -36,13 +36,25 @@ public class ClientPickerDialog extends JDialog {
     private JButton btnChoisir;
     private JButton btnAnnuler;
 
+    private Long pickedId = null;
+
     public ClientPickerDialog(Window owner, SessionContext session) {
         super(owner, "Choisir un client", ModalityType.APPLICATION_MODAL);
         this.session = session;
 
-        // UI only : on récupère l'interface via ServiceRegistry
-        // Adapte si ton getter s'appelle autrement
-        ClientService clientService = ServiceRegistry.get().clientService();
+        /**
+         * IMPORTANT (UI-only) :
+         * Ton ServiceRegistry actuel ne contient PAS encore ClientService (seulement EmpruntService).
+         * Donc ici, tu as 2 choix :
+         *
+         * 1) (RECOMMANDÉ) : ajouter ClientService dans ServiceRegistry (sans casser l'UI)
+         *    -> puis remplacer "clientService = ..." par "ServiceRegistry.get().clientService()"
+         *
+         * 2) (TEMPORAIRE) : passer directement un ClientService mock/impl depuis l'endroit qui ouvre le dialog.
+         *
+         * Ici, je garde un code QUI COMPILE, en attendant que tu ajoutes ClientService au registry :
+         */
+        ClientService clientService = getClientServiceOrThrow();
         this.controller = new ClientController(clientService);
 
         setSize(760, 440);
@@ -51,12 +63,29 @@ public class ClientPickerDialog extends JDialog {
         refresh();
     }
 
+    /** UI-only : si ClientService n'est pas encore câblé dans ServiceRegistry, on explique clairement. */
+    private ClientService getClientServiceOrThrow() {
+        // Quand tu ajoutes ClientService au ServiceRegistry, remplace tout le contenu par :
+        // return ServiceRegistry.get().clientService();
+
+        // Pour l'instant, ServiceRegistry n'a pas ClientService => on ne peut pas le récupérer.
+        throw new IllegalStateException(
+                "ClientService n'est pas encore câblé dans ServiceRegistry.\n\n" +
+                "Solution: ajoute dans ServiceRegistry un champ ClientService + getter clientService().\n" +
+                "Ensuite, dans ClientPickerDialog, remplace getClientServiceOrThrow() par ServiceRegistry.get().clientService()."
+        );
+    }
+
     public boolean isSelected() {
         return selected;
     }
 
     public Client getPicked() {
         return picked;
+    }
+
+    public Long getPickedId() {
+        return pickedId;
     }
 
     private void initUi() {
@@ -82,7 +111,8 @@ public class ClientPickerDialog extends JDialog {
         });
 
         txtRecherche.addKeyListener(new KeyAdapter() {
-            @Override public void keyPressed(KeyEvent e) {
+            @Override
+            public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) refresh();
             }
         });
@@ -167,40 +197,18 @@ public class ClientPickerDialog extends JDialog {
             return;
         }
 
-        // On reconstruit un Client minimal depuis la row (suffisant UI)
         Client c = new Client();
-        // si ton Client a setterId public, utilise c.setId(id).
-        // sinon, on s'en passe : on stocke l'id + champs visibles (nom/tel/ville).
-        // Ici on set juste les champs sûrs :
-        // (Si ton modèle ne permet pas de setter l'id, garde pickedId séparé)
         try {
-            // Beaucoup de vos entités héritent BaseEntity avec setId protected.
-            // Donc on évite setId -> on utilise l'id depuis la table lors de la création.
             c.setNom((String) table.getValueAt(row, 1));
             c.setTelephone((String) table.getValueAt(row, 2));
             c.setVille((String) table.getValueAt(row, 3));
-
-            // On stocke l'id dans picked via un champ "workaround" :
-            // => on garde pickedId séparé via un champ membre (mieux).
         } catch (Exception ignored) {}
 
-        // Meilleure solution: on garde l'id + infos visibles
-        // et on crée un "ClientPicked" DTO. Mais pour rester simple:
         this.picked = c;
-        // on met l'id dans un client "shadow" via propriété clientId séparée:
-        // -> on va retourner l'id via une méthode getPickedId().
+        this.pickedId = id;
         this.selected = true;
 
-        // Stocker l'id dans clientPickerDialog
-        this.pickedId = id;
-
         dispose();
-    }
-
-    private Long pickedId = null;
-
-    public Long getPickedId() {
-        return pickedId;
     }
 
     private Long selectedId() {
