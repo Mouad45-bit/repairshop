@@ -16,6 +16,7 @@ import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.model.enums.StatutReparation;
 import com.maven.repairshop.ui.controllers.ReparationController;
 import com.maven.repairshop.ui.dialogs.ReparationDetailDialog;
+import com.maven.repairshop.ui.dialogs.ReparationFormDialog;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class ReparationsPanel extends JPanel {
@@ -28,6 +29,8 @@ public class ReparationsPanel extends JPanel {
 
     private JTextField txtRecherche;
     private JComboBox<Object> cbStatut;
+
+    private JButton btnAjouter;
     private JButton btnRechercher;
     private JButton btnActualiser;
 
@@ -53,10 +56,10 @@ public class ReparationsPanel extends JPanel {
     private void initTopBar() {
         JPanel panelTop = new JPanel(new BorderLayout());
 
+        // gauche : recherche + filtre
         JPanel panelSearch = new JPanel(new FlowLayout(FlowLayout.LEFT));
         txtRecherche = new JTextField(16);
 
-        // "Tous" + enums
         cbStatut = new JComboBox<>();
         cbStatut.addItem("Tous");
         for (StatutReparation s : StatutReparation.values()) {
@@ -72,6 +75,11 @@ public class ReparationsPanel extends JPanel {
         panelSearch.add(cbStatut);
         panelSearch.add(btnRechercher);
         panelSearch.add(btnActualiser);
+
+        // droite : Ajouter
+        JPanel panelRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnAjouter = new JButton("+ Ajouter");
+        panelRight.add(btnAjouter);
 
         // events
         btnRechercher.addActionListener(e -> refresh());
@@ -89,26 +97,25 @@ public class ReparationsPanel extends JPanel {
             }
         });
 
+        btnAjouter.addActionListener(e -> onAjouter());
+
         panelTop.add(panelSearch, BorderLayout.CENTER);
+        panelTop.add(panelRight, BorderLayout.EAST);
+
         add(panelTop, BorderLayout.NORTH);
     }
 
     private void initTable() {
-        // Col 0 = ID caché (très important)
         tableModel = new DefaultTableModel(
                 new Object[]{"ID", "Code", "Client", "Statut", "Dernier statut"},
                 0
         ) {
-            @Override
-            public boolean isCellEditable(int row, int col) {
-                return false;
-            }
+            @Override public boolean isCellEditable(int row, int col) { return false; }
         };
 
         table = new JTable(tableModel);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        // cacher la colonne ID
         TableColumn idCol = table.getColumnModel().getColumn(0);
         idCol.setMinWidth(0);
         idCol.setMaxWidth(0);
@@ -128,7 +135,6 @@ public class ReparationsPanel extends JPanel {
         btnChangerStatut.addActionListener(e -> onChangerStatut());
         btnAnnuler.addActionListener(e -> onAnnuler());
 
-        // Ordre conseillé : Détail, Changer statut, Annuler
         panelActions.add(btnDetail);
         panelActions.add(btnChangerStatut);
         panelActions.add(btnAnnuler);
@@ -156,13 +162,24 @@ public class ReparationsPanel extends JPanel {
             StatutReparation st = r.getStatut();
             String last = (r.getDateDernierStatut() != null) ? r.getDateDernierStatut().format(DT_FMT) : "";
 
-            tableModel.addRow(new Object[]{
-                    id,
-                    code,
-                    client,
-                    st,
-                    last
-            });
+            tableModel.addRow(new Object[]{ id, code, client, st, last });
+        }
+    }
+
+    private void onAjouter() {
+        Window w = SwingUtilities.getWindowAncestor(this);
+        ReparationFormDialog dlg = new ReparationFormDialog(w, session);
+        dlg.setVisible(true);
+
+        if (!dlg.isSaved()) return;
+
+        // Refresh liste
+        refresh();
+
+        // Option UX : ouvrir directement le détail de la nouvelle réparation
+        Reparation created = dlg.getCreated();
+        if (created != null && created.getId() != null) {
+            new ReparationDetailDialog(w, session, created.getId()).setVisible(true);
         }
     }
 
@@ -184,7 +201,6 @@ public class ReparationsPanel extends JPanel {
             return;
         }
 
-        // statut actuel (depuis table)
         Object stObj = table.getValueAt(table.getSelectedRow(), 3);
         StatutReparation current = (stObj instanceof StatutReparation) ? (StatutReparation) stObj : null;
 
@@ -230,7 +246,7 @@ public class ReparationsPanel extends JPanel {
         int row = table.getSelectedRow();
         if (row < 0) return null;
 
-        Object v = table.getValueAt(row, 0); // colonne ID cachée
+        Object v = table.getValueAt(row, 0);
         if (v instanceof Long) return (Long) v;
         if (v instanceof Number) return ((Number) v).longValue();
         return null;
@@ -239,18 +255,15 @@ public class ReparationsPanel extends JPanel {
     private StatutReparation selectedStatutOrNull() {
         Object s = cbStatut.getSelectedItem();
         if (s instanceof StatutReparation) return (StatutReparation) s;
-        return null; // "Tous"
+        return null;
     }
 
     private Long currentReparateurId() {
-        // Adapte si ton SessionContext expose différemment
         try {
-            // Exemples possibles: session.getUser().getId() ou session.getCurrentUser().getId()
             var user = session.getUser();
             if (user != null) return user.getId();
-        } catch (Exception ignored) {
-        }
-        return null; // si null => le mock peut retourner tout
+        } catch (Exception ignored) {}
+        return null;
     }
 
     private static String safe(String s) {
