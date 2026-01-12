@@ -12,6 +12,7 @@ import com.maven.repairshop.ui.dialogs.EmpruntDialog;
 import com.maven.repairshop.ui.session.SessionContext;
 
 import com.maven.repairshop.ui.controllers.ControllerRegistry;
+import com.maven.repairshop.ui.controllers.EmpruntController;
 import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.model.enums.TypeEmprunt;
 
@@ -19,7 +20,7 @@ public class EmpruntsPanel extends JPanel {
 
     private final SessionContext session;
 
-    private final var ctrl = ControllerRegistry.get().emprunts();
+    private final EmpruntController ctrl = ControllerRegistry.get().emprunts();
 
     private JTable table;
     private DefaultTableModel model;
