@@ -5,19 +5,20 @@ import java.awt.FlowLayout;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumn;
 
 import com.maven.repairshop.model.Client;
 import com.maven.repairshop.ui.controllers.ClientController;
-import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.dialogs.ClientDialog;
 import com.maven.repairshop.ui.session.SessionContext;
+import com.maven.repairshop.ui.util.UiServices;
 
 public class ClientsPanel extends JPanel {
 
     private final SessionContext session;
 
-    private final ClientController ctrl = ControllerRegistry.get().clients();
+    private final ClientController ctrl = new ClientController(UiServices.get().clients());
 
     private JTable table;
     private DefaultTableModel model;
@@ -55,11 +56,18 @@ public class ClientsPanel extends JPanel {
         add(top, BorderLayout.NORTH);
 
         // ===== TABLE =====
-        model = new DefaultTableModel(new Object[] { "ID", "Nom", "Téléphone", "Email", "Ville" }, 0) {
+        model = new DefaultTableModel(new Object[] { "ID", "Nom", "Téléphone", "Email", "Adresse", "Ville" }, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
         table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        // cacher colonne ID
+        TableColumn idCol = table.getColumnModel().getColumn(0);
+        idCol.setMinWidth(0);
+        idCol.setMaxWidth(0);
+        idCol.setPreferredWidth(0);
+
         add(new JScrollPane(table), BorderLayout.CENTER);
 
         // ===== BOTTOM =====
@@ -96,11 +104,8 @@ public class ClientsPanel extends JPanel {
 
         String q = txtSearch.getText() == null ? "" : txtSearch.getText().trim();
 
-        if (q.isEmpty()) {
-            ctrl.lister(this, reparateurId, this::fillTable);
-        } else {
-            ctrl.rechercher(this, reparateurId, q, this::fillTable);
-        }
+        // Pas de lister() dans le contract => rechercher("") doit retourner tous
+        ctrl.rechercher(this, q, reparateurId, this::fillTable);
     }
 
     private void fillTable(java.util.List<Client> list) {
@@ -108,10 +113,11 @@ public class ClientsPanel extends JPanel {
         for (Client c : list) {
             model.addRow(new Object[] {
                     c.getId(),
-                    c.getNom(),
-                    c.getTelephone(),
-                    c.getEmail(),
-                    c.getVille()
+                    safe(c.getNom()),
+                    safe(c.getTelephone()),
+                    safe(c.getEmail()),
+                    safe(c.getAdresse()),
+                    safe(c.getVille())
             });
         }
     }
@@ -132,12 +138,9 @@ public class ClientsPanel extends JPanel {
         ClientDialog.ClientFormData data = dlg.getFormData();
         if (data == null) return;
 
-        // Adresse + imagePath pas encore dans ton dialog => valeurs par défaut
-        String adresse = "";
-        String imagePath = "";
-
-        ctrl.creer(this, reparateurId,
-                data.nom, data.telephone, data.email, adresse, data.ville, imagePath,
+        ctrl.creer(this,
+                data.nom, data.telephone, data.email, data.adresse, data.ville,
+                reparateurId,
                 created -> {
                     UiDialogs.info(this, "Client ajouté.");
                     refresh();
@@ -152,10 +155,11 @@ public class ClientsPanel extends JPanel {
         String oldNom = safe(model.getValueAt(row, 1));
         String oldTel = safe(model.getValueAt(row, 2));
         String oldEmail = safe(model.getValueAt(row, 3));
-        String oldVille = safe(model.getValueAt(row, 4));
+        String oldAdresse = safe(model.getValueAt(row, 4));
+        String oldVille = safe(model.getValueAt(row, 5));
 
         ClientDialog dlg = new ClientDialog(SwingUtilities.getWindowAncestor(this));
-        dlg.setModeEdit(id, oldNom, oldTel, oldEmail, oldVille);
+        dlg.setModeEdit(id, oldNom, oldTel, oldEmail, oldAdresse, oldVille);
         dlg.setVisible(true);
 
         if (!dlg.isSaved()) return;
@@ -163,12 +167,8 @@ public class ClientsPanel extends JPanel {
         ClientDialog.ClientFormData data = dlg.getFormData();
         if (data == null) return;
 
-        // Adresse + imagePath pas encore dans ton dialog => valeurs par défaut
-        String adresse = "";
-        String imagePath = "";
-
         ctrl.modifier(this, id,
-                data.nom, data.telephone, data.email, adresse, data.ville, imagePath,
+                data.nom, data.telephone, data.email, data.adresse, data.ville,
                 () -> {
                     UiDialogs.info(this, "Client modifié.");
                     refresh();
@@ -201,7 +201,8 @@ public class ClientsPanel extends JPanel {
         String nom = safe(model.getValueAt(row, 1));
         String tel = safe(model.getValueAt(row, 2));
         String email = safe(model.getValueAt(row, 3));
-        String ville = safe(model.getValueAt(row, 4));
+        String adresse = safe(model.getValueAt(row, 4));
+        String ville = safe(model.getValueAt(row, 5));
 
         JOptionPane.showMessageDialog(
                 this,
@@ -209,6 +210,7 @@ public class ClientsPanel extends JPanel {
                 "Nom: " + nom + "\n" +
                 "Téléphone: " + tel + "\n" +
                 "Email: " + email + "\n" +
+                "Adresse: " + adresse + "\n" +
                 "Ville: " + ville + "\n\n" +
                 "(Plus tard: ouvrir un vrai écran détail + historique réparations.)",
                 "Détail client",
