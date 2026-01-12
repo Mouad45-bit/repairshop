@@ -18,6 +18,12 @@ import javax.swing.SwingConstants;
 import com.maven.repairshop.ui.session.SessionContext;
 import com.maven.repairshop.ui.util.ServiceRegistry;
 
+import com.maven.repairshop.ui.pages.DashboardPanel;
+import com.maven.repairshop.ui.pages.ReparationsPanel;
+import com.maven.repairshop.ui.pages.ClientsPanel;
+import com.maven.repairshop.ui.pages.CaissePanel;
+import com.maven.repairshop.ui.pages.EmpruntsPanel;
+
 /**
  * Fenêtre principale :
  * - Sidebar navigation
@@ -99,6 +105,9 @@ public class MainFrame extends JFrame {
         JButton btnCaisse = new JButton("Caisse");
         JButton btnEmprunts = new JButton("Emprunts / Prêts");
 
+        // Bouton Déconnexion
+        JButton btnLogout = new JButton("Déconnexion");
+
         // Taille uniforme
         Dimension btnSize = new Dimension(190, 32);
         btnDashboard.setPreferredSize(btnSize);
@@ -106,6 +115,7 @@ public class MainFrame extends JFrame {
         btnClients.setPreferredSize(btnSize);
         btnCaisse.setPreferredSize(btnSize);
         btnEmprunts.setPreferredSize(btnSize);
+        btnLogout.setPreferredSize(btnSize);
 
         sidebar.add(btnDashboard);
         sidebar.add(btnReparations);
@@ -113,12 +123,8 @@ public class MainFrame extends JFrame {
         sidebar.add(btnCaisse);
         sidebar.add(btnEmprunts);
 
-        // Exemple : certaines pages peuvent être visibles uniquement pour propriétaire
-        // (tu pourras ajuster après selon votre cahier)
-        if (session.isReparateur()) {
-            // le réparateur peut avoir accès à caisse/emprunts aussi, donc on ne masque rien pour l'instant
-            // si tu veux masquer "Stats" plus tard, on fera un bouton Stats réservé propriétaire
-        }
+        sidebar.add(new JLabel(" ")); // espace
+        sidebar.add(btnLogout);
 
         getContentPane().add(sidebar, BorderLayout.WEST);
 
@@ -126,12 +132,12 @@ public class MainFrame extends JFrame {
         cardLayout = new CardLayout();
         contentPanel = new JPanel(cardLayout);
 
-        // Pages placeholder pour l’instant (on les fera fichier par fichier)
-        contentPanel.add(simplePage("Dashboard (à coder)"), CARD_DASHBOARD);
-        contentPanel.add(simplePage("Réparations (à coder)"), CARD_REPARATIONS);
-        contentPanel.add(simplePage("Clients (à coder)"), CARD_CLIENTS);
-        contentPanel.add(simplePage("Caisse (à coder)"), CARD_CAISSE);
-        contentPanel.add(simplePage("Emprunts / Prêts (à coder)"), CARD_EMPRUNTS);
+        //
+        contentPanel.add(new DashboardPanel(session), CARD_DASHBOARD);
+        contentPanel.add(new ReparationsPanel(session), CARD_REPARATIONS);
+        contentPanel.add(new ClientsPanel(session), CARD_CLIENTS);
+        contentPanel.add(new CaissePanel(session), CARD_CAISSE);
+        contentPanel.add(new EmpruntsPanel(session), CARD_EMPRUNTS);
 
         getContentPane().add(contentPanel, BorderLayout.CENTER);
 
@@ -142,8 +148,28 @@ public class MainFrame extends JFrame {
         btnCaisse.addActionListener(e -> showCard(CARD_CAISSE));
         btnEmprunts.addActionListener(e -> showCard(CARD_EMPRUNTS));
 
+        // Déconnexion
+        btnLogout.addActionListener(e -> doLogout());
+
         // Par défaut
         showCard(CARD_DASHBOARD);
+    }
+
+    private void doLogout() {
+        int ok = JOptionPane.showConfirmDialog(
+                this,
+                "Se déconnecter ?",
+                "Déconnexion",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (ok != JOptionPane.YES_OPTION) return;
+
+        // IMPORTANT : on ne shutdown PAS Hibernate ici (reconnexion possible).
+        dispose();
+
+        LoginFrame login = new LoginFrame();
+        login.setLocationRelativeTo(null);
+        login.setVisible(true);
     }
 
     private JPanel simplePage(String text) {
