@@ -11,10 +11,6 @@ import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.ui.controllers.ReparationController;
 import com.maven.repairshop.ui.session.SessionContext;
 
-/**
- * - Créer une réparation via le contract ReparationService.creerReparation(clientId, reparateurId)
- * - Ici on demande seulement le clientId (le reste viendra plus tard: objets/causes/paiements)
- */
 public class ReparationFormDialog extends JDialog {
 
     private final SessionContext session;
@@ -23,7 +19,11 @@ public class ReparationFormDialog extends JDialog {
     private boolean saved = false;
     private Reparation created = null;
 
-    private JTextField txtClientId;
+    private Long selectedClientId = null;
+    private String selectedClientLabel = "";
+
+    private JTextField txtClient;
+    private JButton btnChoisirClient;
 
     private JButton btnEnregistrer;
     private JButton btnAnnuler;
@@ -32,7 +32,7 @@ public class ReparationFormDialog extends JDialog {
         super(owner, "Ajouter réparation", ModalityType.APPLICATION_MODAL);
         this.session = session;
 
-        setSize(520, 220);
+        setSize(580, 250);
         setLocationRelativeTo(owner);
         initUi();
     }
@@ -48,16 +48,21 @@ public class ReparationFormDialog extends JDialog {
     private void initUi() {
         setLayout(new BorderLayout());
 
-        JPanel center = new JPanel(new GridLayout(2, 2, 10, 10));
+        JPanel center = new JPanel(new GridLayout(2, 3, 10, 10));
         center.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
 
-        center.add(new JLabel("Client ID:"));
-        txtClientId = new JTextField();
-        center.add(txtClientId);
+        center.add(new JLabel("Client:"));
 
-        // petit texte aide
+        txtClient = new JTextField();
+        txtClient.setEditable(false);
+        center.add(txtClient);
+
+        btnChoisirClient = new JButton("Choisir...");
+        center.add(btnChoisirClient);
+
         center.add(new JLabel(""));
-        center.add(new JLabel("<html><span style='color:#666'>Astuce: récupère l'ID depuis la page Clients.</span></html>"));
+        center.add(new JLabel("<html><span style='color:#666'>Choisis un client puis Enregistrer.</span></html>"));
+        center.add(new JLabel(""));
 
         add(center, BorderLayout.CENTER);
 
@@ -65,6 +70,9 @@ public class ReparationFormDialog extends JDialog {
         btnEnregistrer = new JButton("Enregistrer");
         btnAnnuler = new JButton("Annuler");
 
+        btnEnregistrer.setEnabled(false);
+
+        btnChoisirClient.addActionListener(e -> onPickClient());
         btnEnregistrer.addActionListener(e -> onSave());
         btnAnnuler.addActionListener(e -> dispose());
 
@@ -76,16 +84,38 @@ public class ReparationFormDialog extends JDialog {
         getRootPane().setDefaultButton(btnEnregistrer);
     }
 
+    private void onPickClient() {
+        Window w = getOwner();
+        ClientPickerDialog dlg = new ClientPickerDialog(w, session);
+        dlg.setVisible(true);
+
+        if (!dlg.isSelected()) return;
+
+        Long id = dlg.getPickedId();
+        if (id == null) {
+            JOptionPane.showMessageDialog(this, "Client invalide.");
+            return;
+        }
+
+        selectedClientId = id;
+
+        // label depuis le client minimal affiché
+        String nom = (dlg.getPicked() != null) ? safe(dlg.getPicked().getNom()) : "";
+        selectedClientLabel = id + (nom.isEmpty() ? "" : " - " + nom);
+
+        txtClient.setText(selectedClientLabel);
+        btnEnregistrer.setEnabled(true);
+    }
+
     private void onSave() {
-        Long clientId = parseLong(txtClientId.getText());
-        if (clientId == null || clientId <= 0) {
-            JOptionPane.showMessageDialog(this, "Client ID invalide.");
+        if (selectedClientId == null || selectedClientId <= 0) {
+            JOptionPane.showMessageDialog(this, "Choisis un client.");
             return;
         }
 
         Long reparateurId = currentReparateurId();
 
-        controller.creerReparation(this, clientId, reparateurId, rep -> {
+        controller.creerReparation(this, selectedClientId, reparateurId, rep -> {
             this.created = rep;
             this.saved = true;
             dispose();
@@ -100,14 +130,7 @@ public class ReparationFormDialog extends JDialog {
         return null;
     }
 
-    private static Long parseLong(String s) {
-        try {
-            if (s == null) return null;
-            String t = s.trim();
-            if (t.isEmpty()) return null;
-            return Long.parseLong(t);
-        } catch (Exception e) {
-            return null;
-        }
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 }
