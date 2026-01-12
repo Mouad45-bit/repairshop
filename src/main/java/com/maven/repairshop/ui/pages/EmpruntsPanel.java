@@ -35,8 +35,6 @@ public class EmpruntsPanel extends JPanel {
     public EmpruntsPanel(SessionContext session) {
         this.session = session;
         initUi();
-
-        // On charge directement depuis la DB via controller
         refresh();
     }
 
@@ -110,16 +108,10 @@ public class EmpruntsPanel extends JPanel {
 
         // ===== EVENTS =====
 
-        // Ajouter (UI dialog pour l’instant)
         btnAdd.addActionListener(e -> openCreate());
-
-        // Modifier (UI dialog pour l’instant)
         btnEdit.addActionListener(e -> openEditSelected());
-
-        // Détail (simple message pour l’instant)
         btnDetail.addActionListener(e -> showDetailSelected());
 
-        // Marquer remboursé (branché controller)
         btnMarkPaid.addActionListener(e -> {
             Long id = getSelectedId();
             if (id == null) return;
@@ -137,10 +129,8 @@ public class EmpruntsPanel extends JPanel {
             }
         });
 
-        // Rechercher = refresh (filtre appliqué côté UI)
         btnSearch.addActionListener(e -> refresh());
 
-        // Actualiser = refresh
         btnRefresh.addActionListener(e -> {
             txtSearch.setText("");
             cbType.setSelectedIndex(0);
@@ -148,41 +138,80 @@ public class EmpruntsPanel extends JPanel {
             refresh();
         });
 
-        // Enter dans recherche => refresh
         txtSearch.addActionListener(e -> refresh());
     }
 
     private void openCreate() {
-        EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this), session);
+        Long reparateurId = session.getReparateurId();
+        if (reparateurId == null) {
+            UiDialogs.warn(this, "Cette page est réservée au réparateur.");
+            return;
+        }
+
+        EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this));
+        dlg.setModeCreate();
         dlg.setVisible(true);
 
-        // Si ton dialog met "saved=true", on refresh
-        if (dlg.isSaved()) {
+        if (!dlg.isSaved()) return;
+
+        EmpruntDialog.EmpruntFormData data = dlg.getFormData();
+        if (data == null) return;
+
+        TypeEmprunt type = "PRET".equalsIgnoreCase(data.type) ? TypeEmprunt.PRET : TypeEmprunt.EMPRUNT;
+
+        // NOTE: ctrl.creer(...) actuel accepte (reparateurId, type, personne, montantStr, motif, onSuccess)
+        // On map "remarque" -> "motif"
+        ctrl.creer(this, reparateurId, type, data.personne, data.montantStr, data.remarque, created -> {
             UiDialogs.info(this, "Ajout OK.");
             refresh();
-        }
+        });
     }
 
     private void openEditSelected() {
         Long id = getSelectedId();
         if (id == null) return;
 
-        EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this), session);
-        dlg.setModeEdit(id);
+        int row = table.getSelectedRow();
+        String type = safe(model.getValueAt(row, 1));
+        String personne = safe(model.getValueAt(row, 2));
+        String montant = safe(model.getValueAt(row, 3));
+        String date = safe(model.getValueAt(row, 4));
+        String statut = safe(model.getValueAt(row, 5));
+        String remarque = safe(model.getValueAt(row, 6));
+
+        EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this));
+        dlg.setModeEdit(id, type, personne, montant, date, statut, remarque);
         dlg.setVisible(true);
 
-        if (dlg.isSaved()) {
-            UiDialogs.info(this, "Modification OK.");
-            refresh();
-        }
+        if (!dlg.isSaved()) return;
+
+        // ⚠️ Pour finaliser "EDIT", il faut une méthode service/controller "modifier(...)"
+        // Si tu l'ajoutes, je branche ça exactement comme ClientsPanel.
+        UiDialogs.warn(this,
+                "Modification prête côté UI.\n" +
+                "À brancher quand EmpruntService.modifier(...) existe.");
     }
 
     private void showDetailSelected() {
         Long id = getSelectedId();
         if (id == null) return;
 
+        int row = table.getSelectedRow();
+        String type = safe(model.getValueAt(row, 1));
+        String personne = safe(model.getValueAt(row, 2));
+        String montant = safe(model.getValueAt(row, 3));
+        String date = safe(model.getValueAt(row, 4));
+        String statut = safe(model.getValueAt(row, 5));
+        String remarque = safe(model.getValueAt(row, 6));
+
         JOptionPane.showMessageDialog(this,
-                "Détail emprunt/prêt #" + id + "\n(À remplacer par un dialog détail si tu veux)",
+                "Emprunt/Prêt #" + id + "\n" +
+                "Type: " + type + "\n" +
+                "Personne: " + personne + "\n" +
+                "Montant: " + montant + "\n" +
+                "Date: " + date + "\n" +
+                "Statut: " + statut + "\n" +
+                "Remarque: " + remarque,
                 "Détail",
                 JOptionPane.INFORMATION_MESSAGE);
     }
@@ -202,12 +231,7 @@ public class EmpruntsPanel extends JPanel {
         }
     }
 
-    /**
-     * Charge depuis la DB via controller (async),
-     * puis applique les filtres côté UI et calcule les totaux.
-     */
     private void refresh() {
-        // Cette page est faite pour le réparateur.
         Long reparateurId = session.getReparateurId();
         if (reparateurId == null) {
             UiDialogs.warn(this, "Cette page est réservée au réparateur (session invalide).");
@@ -215,53 +239,38 @@ public class EmpruntsPanel extends JPanel {
         }
 
         ctrl.lister(this, reparateurId, list -> {
-            // Appliquer filtres UI
             List<Object[]> rows = toRowsFiltered(list);
 
-            // Remplir table
             model.setRowCount(0);
             for (Object[] r : rows) model.addRow(r);
 
-            // Totaux
             updateTotalsFromRows(rows);
         });
     }
 
     private List<Object[]> toRowsFiltered(List<?> rawList) {
-        // On travaille en "var" au runtime, pas besoin de type générique
         String q = txtSearch.getText() != null ? txtSearch.getText().trim().toLowerCase() : "";
         String typeSel = (String) cbType.getSelectedItem();
         String statutSel = (String) cbStatut.getSelectedItem();
 
         List<Object[]> out = new ArrayList<>();
 
-        for (var e : rawList) {
-            // --- champs attendus selon ton modèle ---
-            // e.getType() : TypeEmprunt
-            // e.getNomPersonne() : String
-            // e.getMontant() : double
-            // e.getDateEmprunt() : Date/LocalDate/String
-            // e.getStatut() : enum
-            // e.getMotif() : String
-
+        for (Object e : rawList) {
             String personne = safeStr(call(e, "getNomPersonne"));
             String motif = safeStr(call(e, "getMotif"));
 
-            String type = safeStr(call(e, "getType"));   // ex: EMPRUNT/PRET
-            String statut = safeStr(call(e, "getStatut")); // ex: EN_COURS/REMBOURSE/PARTIEL
+            String type = safeStr(call(e, "getType"));
+            String statut = safeStr(call(e, "getStatut"));
 
-            // filtre personne
             if (!q.isEmpty()) {
                 String hay = (personne + " " + motif).toLowerCase();
                 if (!hay.contains(q)) continue;
             }
 
-            // filtre type
             if (!"Tous".equalsIgnoreCase(typeSel)) {
                 if (!typeSel.equalsIgnoreCase(type)) continue;
             }
 
-            // filtre statut
             if (!"Tous".equalsIgnoreCase(statutSel)) {
                 if (!statutSel.equalsIgnoreCase(statut)) continue;
             }
@@ -284,12 +293,6 @@ public class EmpruntsPanel extends JPanel {
         return out;
     }
 
-    /**
-     * Totaux "en cours" :
-     * - EN_COURS + PARTIEL (toute autre valeur est ignorée)
-     * - EMPRUNT => total emprunts
-     * - PRET => total prêts
-     */
     private void updateTotalsFromRows(List<Object[]> rows) {
         double totalEmprunts = 0;
         double totalPrets = 0;
@@ -316,12 +319,10 @@ public class EmpruntsPanel extends JPanel {
     }
 
     private String formatDh(double v) {
-        // simple: pas de DecimalFormat pour rester léger
         if (v == (long) v) return ((long) v) + " DH";
         return String.format("%.2f DH", v);
     }
 
-    // --------- Helpers (évite de casser si ton modèle n'a pas exactement les mêmes méthodes) ---------
     private Object call(Object obj, String method) {
         try {
             return obj.getClass().getMethod(method).invoke(obj);
@@ -332,5 +333,9 @@ public class EmpruntsPanel extends JPanel {
 
     private String safeStr(Object v) {
         return v == null ? "" : v.toString();
+    }
+
+    private String safe(Object o) {
+        return o == null ? "" : o.toString();
     }
 }
