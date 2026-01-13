@@ -17,6 +17,7 @@ public final class ControllerRegistry {
     private static final ControllerRegistry INSTANCE = new ControllerRegistry();
 
     private final ReparationController reparationController;
+    private final SuiviController suiviController;
     private final EmpruntController empruntController;
     private final ClientController clientController;
 
@@ -28,6 +29,7 @@ public final class ControllerRegistry {
 
         // controllers UI
         this.reparationController = new ReparationController(reparationService);
+        this.suiviController = new SuiviController(reparationService); // même service
         this.empruntController = new EmpruntController(empruntService);
         this.clientController = new ClientController(clientService);
     }
@@ -38,6 +40,10 @@ public final class ControllerRegistry {
 
     public ReparationController reparations() {
         return reparationController;
+    }
+
+    public SuiviController suivi() {
+        return suiviController;
     }
 
     public EmpruntController emprunts() {
