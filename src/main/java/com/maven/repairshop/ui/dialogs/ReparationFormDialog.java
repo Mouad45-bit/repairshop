@@ -8,13 +8,16 @@ import java.awt.Window;
 import javax.swing.*;
 
 import com.maven.repairshop.model.Reparation;
+import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.ReparationController;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class ReparationFormDialog extends JDialog {
 
     private final SessionContext session;
-    private final ReparationController controller = new ReparationController();
+
+    // controller via registry (UI -> ServiceRegistry -> backend)
+    private final ReparationController controller = ControllerRegistry.get().reparations();
 
     private boolean saved = false;
     private Reparation created = null;
