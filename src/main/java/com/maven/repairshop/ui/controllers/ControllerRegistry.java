@@ -3,15 +3,14 @@ package com.maven.repairshop.ui.controllers;
 import com.maven.repairshop.service.ClientService;
 import com.maven.repairshop.service.EmpruntService;
 import com.maven.repairshop.service.ReparationService;
-import com.maven.repairshop.ui.util.UiServices;
+import com.maven.repairshop.ui.util.ServiceRegistry;
 
 /**
  * Registre UI des controllers.
- * IMPORTANT: dépend uniquement de UiServices (contracts + mocks).
- * Aucune dépendance Hibernate/DAO ici.
  *
- * Plus tard: vos collègues pourront faire UiServices.overrideXxxService(...)
- * pour brancher les vraies impl backend sans changer l'UI.
+ * Règles:
+ * - Ne dépend que des interfaces service (contracts backend).
+ * - Les impl concrètes sont fournies par ServiceRegistry (chargement backend).
  */
 public final class ControllerRegistry {
 
@@ -22,10 +21,10 @@ public final class ControllerRegistry {
     private final ClientController clientController;
 
     private ControllerRegistry() {
-        // services (contracts) depuis UiServices
-        ReparationService reparationService = UiServices.get().reparations();
-        EmpruntService empruntService = UiServices.get().emprunts();
-        ClientService clientService = UiServices.get().clients();
+        // services (contracts) depuis ServiceRegistry (backend)
+        ReparationService reparationService = ServiceRegistry.get().reparations();
+        EmpruntService empruntService = ServiceRegistry.get().emprunts();
+        ClientService clientService = ServiceRegistry.get().clients();
 
         // controllers UI
         this.reparationController = new ReparationController(reparationService);
