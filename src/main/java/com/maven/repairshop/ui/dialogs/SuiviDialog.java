@@ -9,13 +9,16 @@ import java.time.format.DateTimeFormatter;
 import javax.swing.*;
 
 import com.maven.repairshop.model.Reparation;
+import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.SuiviController;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class SuiviDialog extends JDialog {
 
     private final SessionContext session;
-    private final SuiviController controller = new SuiviController();
+
+    // controller via registry (UI -> ServiceRegistry -> backend)
+    private final SuiviController controller = ControllerRegistry.get().suivi();
 
     private JTextField txtCode;
     private JButton btnSuivre;
