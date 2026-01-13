@@ -13,14 +13,17 @@ import javax.swing.table.DefaultTableModel;
 
 import com.maven.repairshop.model.Emprunt;
 import com.maven.repairshop.model.enums.TypeEmprunt;
-import com.maven.repairshop.ui.controllers.UiAsync;
+import com.maven.repairshop.ui.controllers.ControllerRegistry;
+import com.maven.repairshop.ui.controllers.EmpruntController;
 import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.session.SessionContext;
-import com.maven.repairshop.ui.util.UiServices;
 
 public class CaissePanel extends JPanel {
 
     private final SessionContext session;
+
+    // controller via registry (UI -> ServiceRegistry -> backend)
+    private final EmpruntController empruntCtrl = ControllerRegistry.get().emprunts();
 
     private JTextField txtDateDebut;
     private JTextField txtDateFin;
@@ -114,10 +117,8 @@ public class CaissePanel extends JPanel {
         LocalDate from = parseDateOrNull(txtDateDebut.getText());
         LocalDate to = parseDateOrNull(txtDateFin.getText());
 
-        UiAsync.run(this,
-                () -> UiServices.get().emprunts().lister(reparateurId),
-                list -> fillFromEmprunts(list, from, to)
-        );
+        // On récupère la liste via le controller
+        empruntCtrl.lister(this, reparateurId, list -> fillFromEmprunts(list, from, to));
     }
 
     private void fillFromEmprunts(List<Emprunt> list, LocalDate from, LocalDate to) {
