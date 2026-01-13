@@ -7,7 +7,6 @@ import java.util.function.Consumer;
 import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.service.ReparationService;
 import com.maven.repairshop.service.exceptions.NotFoundException;
-import com.maven.repairshop.ui.util.UiServices;
 
 /**
  * UI-only : Suivi par codeUnique.
@@ -17,8 +16,8 @@ public class SuiviController {
 
     private final ReparationService service;
 
-    public SuiviController() {
-        this.service = UiServices.get().reparations();
+    public SuiviController(ReparationService service) {
+        this.service = service;
     }
 
     /**
@@ -41,11 +40,11 @@ public class SuiviController {
             throw new IllegalArgumentException("Veuillez saisir un code de suivi.");
         }
 
-        // On utilise le contrat: rechercher(query, reparateurId, statut)
+        // Contrat: rechercher(query, reparateurId, statut)
         // Statut null => "Tous"
         List<Reparation> list = service.rechercher(code, reparateurId, null);
 
-        // On match strict sur codeUnique (meilleure précision)
+        // Match strict sur codeUnique (meilleure précision)
         for (Reparation r : list) {
             if (r != null && r.getCodeUnique() != null && r.getCodeUnique().equalsIgnoreCase(code)) {
                 return r;
