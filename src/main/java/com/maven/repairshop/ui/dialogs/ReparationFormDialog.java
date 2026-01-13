@@ -116,21 +116,17 @@ public class ReparationFormDialog extends JDialog {
             return;
         }
 
-        Long reparateurId = currentReparateurId();
+        Long reparateurId = session.getReparateurId();
+        if (reparateurId == null) {
+            JOptionPane.showMessageDialog(this, "Session invalide (réparateur introuvable).");
+            return;
+        }
 
         controller.creerReparation(this, selectedClientId, reparateurId, rep -> {
             this.created = rep;
             this.saved = true;
             dispose();
         });
-    }
-
-    private Long currentReparateurId() {
-        try {
-            var user = session.getUser();
-            if (user != null) return user.getId();
-        } catch (Exception ignored) {}
-        return null;
     }
 
     private static String safe(String s) {
