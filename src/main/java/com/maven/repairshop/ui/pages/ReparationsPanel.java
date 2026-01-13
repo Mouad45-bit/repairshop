@@ -24,7 +24,7 @@ public class ReparationsPanel extends JPanel {
 
     private final SessionContext session;
 
-    // ✅ controller via registry (UI -> ServiceRegistry -> backend)
+    // controller via registry (UI -> ServiceRegistry -> backend)
     private final ReparationController controller = ControllerRegistry.get().reparations();
 
     private JTable table;
@@ -148,8 +148,13 @@ public class ReparationsPanel extends JPanel {
     // ---------------- Logic UI ----------------
 
     private void refresh() {
+        Long reparateurId = session.getReparateurId();
+        if (reparateurId == null) {
+            JOptionPane.showMessageDialog(this, "Session invalide (réparateur introuvable).");
+            return;
+        }
+
         String query = txtRecherche.getText();
-        Long reparateurId = currentReparateurId();
         StatutReparation statut = selectedStatutOrNull();
 
         controller.rechercher(this, query, reparateurId, statut, this::fillTable);
@@ -258,14 +263,6 @@ public class ReparationsPanel extends JPanel {
     private StatutReparation selectedStatutOrNull() {
         Object s = cbStatut.getSelectedItem();
         if (s instanceof StatutReparation) return (StatutReparation) s;
-        return null;
-    }
-
-    private Long currentReparateurId() {
-        try {
-            var user = session.getUser();
-            if (user != null) return user.getId();
-        } catch (Exception ignored) {}
         return null;
     }
 
