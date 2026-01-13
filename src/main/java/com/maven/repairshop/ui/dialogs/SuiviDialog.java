@@ -92,7 +92,12 @@ public class SuiviDialog extends JDialog {
     private void onSuivre() {
         String code = txtCode.getText();
 
-        Long reparateurId = currentReparateurId();
+        Long reparateurId = session.getReparateurId();
+        if (reparateurId == null) {
+            JOptionPane.showMessageDialog(this, "Session invalide (réparateur introuvable).");
+            return;
+        }
+
         controller.suivre(this, code, reparateurId, this::showResult);
     }
 
@@ -101,14 +106,6 @@ public class SuiviDialog extends JDialog {
         lblClient.setText(r.getClient() != null ? safe(r.getClient().getNom()) : "");
         lblStatut.setText(r.getStatut() != null ? r.getStatut().name() : "");
         lblDate.setText(r.getDateDernierStatut() != null ? r.getDateDernierStatut().format(DT_FMT) : "");
-    }
-
-    private Long currentReparateurId() {
-        try {
-            var user = session.getUser();
-            if (user != null) return user.getId();
-        } catch (Exception ignored) {}
-        return null;
     }
 
     private static String safe(String s) {
