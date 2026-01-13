@@ -10,6 +10,7 @@ import javax.swing.*;
 
 import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.model.enums.StatutReparation;
+import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.ReparationController;
 import com.maven.repairshop.ui.session.SessionContext;
 
@@ -21,7 +22,9 @@ import com.maven.repairshop.ui.session.SessionContext;
 public class ReparationDetailDialog extends JDialog {
 
     private final SessionContext session;
-    private final ReparationController controller = new ReparationController();
+
+    // controller via registry (UI -> ServiceRegistry -> backend)
+    private final ReparationController controller = ControllerRegistry.get().reparations();
 
     private final Long reparationId;
 
