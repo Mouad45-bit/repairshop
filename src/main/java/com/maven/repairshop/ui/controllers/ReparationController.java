@@ -7,14 +7,13 @@ import java.util.function.Consumer;
 import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.model.enums.StatutReparation;
 import com.maven.repairshop.service.ReparationService;
-import com.maven.repairshop.ui.util.UiServices;
 
 public class ReparationController {
 
     private final ReparationService service;
 
-    public ReparationController() {
-        this.service = UiServices.get().reparations();
+    public ReparationController(ReparationService service) {
+        this.service = service;
     }
 
     /** Liste + recherche + filtre statut */
