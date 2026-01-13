@@ -1,57 +1,89 @@
 package com.maven.repairshop.ui.util;
 
-import com.maven.repairshop.dao.EmpruntDao;
+import com.maven.repairshop.service.ClientService;
 import com.maven.repairshop.service.EmpruntService;
-import com.maven.repairshop.service.impl.EmpruntServiceImpl;
+import com.maven.repairshop.service.ReparationService;
 import com.maven.repairshop.util.HibernateUtil;
 
 /**
  * Registre central des services pour l'UI Swing.
- * Objectif : l'UI n'instancie pas Hibernate/DAO directement.
  *
- * Pour l'instant, on câble seulement Emprunt (car c'est le seul service implémenté).
- * Les autres (Client/Reparation/Paiement/Auth...) seront ajoutés plus tard
- * sans casser les écrans.
+ * Règles:
+ * - L'UI dépend uniquement des interfaces de service (contracts backend).
+ * - Aucun mock ici.
+ * - Les impl concrètes seront mergées plus tard par les collaborateurs backend.
+ *
+ * Technique:
+ * - Chargement lazy via réflexion pour éviter des dépendances compile-time
+ *   vers des classes d'impl qui n'existent pas encore au moment du merge UI.
+ *
+ * Convention attendue côté backend (modifiable ici si besoin):
+ * - com.maven.repairshop.service.impl.EmpruntServiceImpl
+ * - com.maven.repairshop.service.impl.ClientServiceImpl
+ * - com.maven.repairshop.service.impl.ReparationServiceImpl
  */
 public final class ServiceRegistry {
 
-    private static ServiceRegistry INSTANCE;
+    private static final ServiceRegistry INSTANCE = new ServiceRegistry();
 
-    // ---- DAO ----
-    private final EmpruntDao empruntDao;
+    private static final String IMPL_EMPRUNT = "com.maven.repairshop.service.impl.EmpruntServiceImpl";
+    private static final String IMPL_CLIENT = "com.maven.repairshop.service.impl.ClientServiceImpl";
+    private static final String IMPL_REPARATION = "com.maven.repairshop.service.impl.ReparationServiceImpl";
 
-    // ---- Services ----
-    private final EmpruntService empruntService;
+    private EmpruntService empruntService;
+    private ClientService clientService;
+    private ReparationService reparationService;
 
-    private ServiceRegistry() {
-        // IMPORTANT : toucher HibernateUtil ici force l'init SessionFactory au lancement UI
-        HibernateUtil.getSessionFactory();
+    private ServiceRegistry() {}
 
-        this.empruntDao = new EmpruntDao();
-        this.empruntService = new EmpruntServiceImpl(empruntDao);
-
-        // Plus tard :
-        // this.clientDao = new ClientDao();
-        // this.clientService = new ClientServiceImpl(clientDao, ...);
-        // etc.
-    }
-
-    /** Singleton simple (une seule instance pour toute l'application Swing). */
-    public static synchronized ServiceRegistry get() {
-        if (INSTANCE == null) {
-            INSTANCE = new ServiceRegistry();
-        }
+    public static ServiceRegistry get() {
         return INSTANCE;
     }
 
-    // ---- Getters services ----
-    public EmpruntService empruntService() {
+    public synchronized EmpruntService emprunts() {
+        if (empruntService == null) {
+            empruntService = newInstance(IMPL_EMPRUNT, EmpruntService.class);
+        }
         return empruntService;
     }
 
+    public synchronized ClientService clients() {
+        if (clientService == null) {
+            clientService = newInstance(IMPL_CLIENT, ClientService.class);
+        }
+        return clientService;
+    }
+
+    public synchronized ReparationService reparations() {
+        if (reparationService == null) {
+            reparationService = newInstance(IMPL_REPARATION, ReparationService.class);
+        }
+        return reparationService;
+    }
+
+    private static <T> T newInstance(String implClassName, Class<T> type) {
+        try {
+            Class<?> clazz = Class.forName(implClassName);
+            Object obj = clazz.getDeclaredConstructor().newInstance();
+            return type.cast(obj);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(
+                    "Implémentation backend introuvable: " + implClassName
+                            + "\nMerge le module backend correspondant, puis relance.",
+                    e
+            );
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Impossible d'instancier le service: " + implClassName
+                            + " (" + e.getClass().getSimpleName() + ")",
+                    e
+            );
+        }
+    }
+
     /**
-     * A appeler à la fermeture de l'application (MainFrame windowClosing).
-     * Cela évite que la JVM reste ouverte (SessionFactory non fermée).
+     * À appeler à la fermeture de l'application (windowClosing).
+     * Permet de fermer proprement la SessionFactory Hibernate si elle a été utilisée.
      */
     public void shutdown() {
         try {
