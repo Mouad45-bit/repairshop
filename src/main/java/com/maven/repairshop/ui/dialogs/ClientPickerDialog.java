@@ -135,9 +135,8 @@ public class ClientPickerDialog extends JDialog {
     }
 
     private void refresh() {
-        Long reparateurId = currentReparateurId();
+        Long reparateurId = session.getReparateurId();
         if (reparateurId == null) {
-            // Pas de session réparateur => impossible de chercher selon le contrat backend
             JOptionPane.showMessageDialog(this, "Session invalide (réparateur introuvable).");
             return;
         }
@@ -201,20 +200,6 @@ public class ClientPickerDialog extends JDialog {
         } catch (Exception ex) {
             return null;
         }
-    }
-
-    private Long currentReparateurId() {
-        try {
-            Long id = session.getReparateurId();
-            if (id != null) return id;
-        } catch (Exception ignored) {}
-
-        try {
-            var user = session.getUser();
-            if (user != null) return user.getId();
-        } catch (Exception ignored) {}
-
-        return null;
     }
 
     private static String safe(String s) {
