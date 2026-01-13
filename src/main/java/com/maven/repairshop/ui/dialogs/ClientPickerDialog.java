@@ -13,8 +13,8 @@ import javax.swing.table.TableColumn;
 
 import com.maven.repairshop.model.Client;
 import com.maven.repairshop.ui.controllers.ClientController;
+import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.session.SessionContext;
-import com.maven.repairshop.ui.util.UiServices;
 
 public class ClientPickerDialog extends JDialog {
 
@@ -41,8 +41,8 @@ public class ClientPickerDialog extends JDialog {
         super(owner, "Choisir un client", ModalityType.APPLICATION_MODAL);
         this.session = session;
 
-        // UI-only : via UiServices (mock today / real impl later)
-        this.controller = new ClientController(UiServices.get().clients());
+        // controller via registry (UI -> ServiceRegistry -> backend)
+        this.controller = ControllerRegistry.get().clients();
 
         setSize(760, 440);
         setLocationRelativeTo(owner);
@@ -136,11 +136,17 @@ public class ClientPickerDialog extends JDialog {
 
     private void refresh() {
         Long reparateurId = currentReparateurId();
+        if (reparateurId == null) {
+            // Pas de session réparateur => impossible de chercher selon le contrat backend
+            JOptionPane.showMessageDialog(this, "Session invalide (réparateur introuvable).");
+            return;
+        }
+
         String q = txtRecherche.getText();
         if (q == null) q = "";
         q = q.trim();
 
-        // Pas de "lister" dans le contract => rechercher("") doit retourner tous
+        // Contract backend: rechercher(query, reparateurId)
         controller.rechercher(this, q, reparateurId, this::fillTable);
     }
 
@@ -190,17 +196,19 @@ public class ClientPickerDialog extends JDialog {
         Object v = table.getValueAt(row, 0);
         if (v instanceof Long) return (Long) v;
         if (v instanceof Number) return ((Number) v).longValue();
-        return null;
+        try {
+            return Long.valueOf(String.valueOf(v));
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private Long currentReparateurId() {
         try {
-            // Chez toi tu utilises déjà session.getReparateurId() dans ClientsPanel
             Long id = session.getReparateurId();
             if (id != null) return id;
         } catch (Exception ignored) {}
 
-        // fallback possible si session expose user
         try {
             var user = session.getUser();
             if (user != null) return user.getId();
