@@ -9,16 +9,17 @@ import javax.swing.table.TableColumn;
 
 import com.maven.repairshop.model.Client;
 import com.maven.repairshop.ui.controllers.ClientController;
+import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.dialogs.ClientDialog;
 import com.maven.repairshop.ui.session.SessionContext;
-import com.maven.repairshop.ui.util.UiServices;
 
 public class ClientsPanel extends JPanel {
 
     private final SessionContext session;
 
-    private final ClientController ctrl = new ClientController(UiServices.get().clients());
+    // Controller récupéré depuis le registre (branché sur ServiceRegistry -> backend)
+    private final ClientController ctrl = ControllerRegistry.get().clients();
 
     private JTable table;
     private DefaultTableModel model;
@@ -104,7 +105,7 @@ public class ClientsPanel extends JPanel {
 
         String q = txtSearch.getText() == null ? "" : txtSearch.getText().trim();
 
-        // Pas de lister() dans le contract => rechercher("") doit retourner tous
+        // Contract backend: rechercher(query, reparateurId)
         ctrl.rechercher(this, q, reparateurId, this::fillTable);
     }
 
