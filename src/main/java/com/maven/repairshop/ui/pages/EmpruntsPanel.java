@@ -12,17 +12,18 @@ import javax.swing.table.DefaultTableModel;
 import com.maven.repairshop.model.Emprunt;
 import com.maven.repairshop.model.enums.StatutEmprunt;
 import com.maven.repairshop.model.enums.TypeEmprunt;
+import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.EmpruntController;
 import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.dialogs.EmpruntDialog;
 import com.maven.repairshop.ui.session.SessionContext;
-import com.maven.repairshop.ui.util.UiServices;
 
 public class EmpruntsPanel extends JPanel {
 
     private final SessionContext session;
 
-    private final EmpruntController ctrl = new EmpruntController(UiServices.get().emprunts());
+    // controller via registry (UI -> ServiceRegistry -> backend)
+    private final EmpruntController ctrl = ControllerRegistry.get().emprunts();
 
     private JTable table;
     private DefaultTableModel model;
