@@ -17,8 +17,10 @@ public class ReparationServiceImpl implements ReparationService {
     private final ReparationDao reparationDao = new ReparationDao();
 
     @Override
+    @Deprecated
     public Reparation creerReparation(Long clientId, Long reparateurId) {
-        // legacy: on garde la signature, mais elle ne permet pas de respecter le cahier (appareils obligatoires)
+        // Legacy: on garde la signature, mais elle ne permet pas de respecter le cahier (appareils obligatoires).
+        // On fait au mieux: on appelle la version sécurisée en considérant "userId = reparateurId".
         return creerReparation(clientId, reparateurId, List.of(), null, null, reparateurId);
     }
 
@@ -102,6 +104,7 @@ public class ReparationServiceImpl implements ReparationService {
                 if (av > 0) {
                     double total = calculerTotalAReparer(rep);
                     if (av > total) throw new ValidationException("Avance > total à payer.");
+
                     Paiement p = new Paiement();
                     p.setMontant(av);
                     p.setTypePaiement(TypePaiement.AVANCE);
@@ -120,8 +123,9 @@ public class ReparationServiceImpl implements ReparationService {
     }
 
     @Override
+    @Deprecated
     public void changerStatut(Long reparationId, StatutReparation nouveauStatut) {
-        // legacy : on suppose action du réparateur propriétaire de la réparation (pas idéal, mais on ne casse pas)
+        // Legacy : il n’y a pas d’actor => on garde ton comportement “fallback”
         changerStatut(reparationId, nouveauStatut, null);
     }
 
@@ -201,7 +205,11 @@ public class ReparationServiceImpl implements ReparationService {
     }
 
     @Override
+    @Deprecated
     public Reparation trouverParId(Long reparationId) {
+        // Legacy: avant c'était "sans sécurité".
+        // Pour ne pas casser mais réduire le risque, on conserve le chargement.
+        // IMPORTANT: la version sécurisée trouverParId(id, userId) doit être utilisée par l’UI.
         return HibernateTx.callInTx(session -> loadReparation(session, reparationId));
     }
 
@@ -211,20 +219,24 @@ public class ReparationServiceImpl implements ReparationService {
         return HibernateTx.callInTx(session -> {
             Utilisateur user = session.get(Utilisateur.class, userId);
             if (user == null) throw new NotFoundException("Utilisateur introuvable: " + userId);
+
             Reparation rep = loadReparation(session, reparationId);
             if (rep == null) throw new NotFoundException("Réparation introuvable: " + reparationId);
+
             assertSameBoutique(user.getBoutique(), rep.getClient().getReparateur().getBoutique());
             return rep;
         });
     }
 
     @Override
+    @Deprecated
     public List<Reparation> rechercher(String query, Long reparateurId, StatutReparation filtreStatut) {
+        // Legacy: conserve l’ancien comportement (listing par réparateur),
+        // mais il n’y a pas de vérification de boutique via userId.
         if (reparateurId == null) throw new ValidationException("Réparateur obligatoire.");
 
         if (filtreStatut != null) {
             if (query == null || query.isBlank()) return reparationDao.findByReparateurAndStatut(reparateurId, filtreStatut);
-            // filtreStatut + query : on fait simple côté service
             return HibernateTx.callInTx(session ->
                     session.createQuery(
                                     "select r from Reparation r " +
@@ -243,6 +255,98 @@ public class ReparationServiceImpl implements ReparationService {
 
         if (query == null || query.isBlank()) return reparationDao.findByReparateur(reparateurId);
         return reparationDao.searchByClientName(reparateurId, query);
+    }
+
+    @Override
+    public List<Reparation> rechercher(String query, Long reparateurId, StatutReparation filtreStatut, Long userId) {
+        if (userId == null) throw new ValidationException("Utilisateur connecté obligatoire.");
+
+        return HibernateTx.callInTx(session -> {
+            Utilisateur user = session.get(Utilisateur.class, userId);
+            if (user == null) throw new NotFoundException("Utilisateur introuvable: " + userId);
+
+            // Si un reparateurId est fourni, on vérifie qu'il est dans la même boutique.
+            // Sinon, on adaptera selon rôle (proprio => boutique entière, réparateur => lui-même)
+            Long effectiveReparateurId = reparateurId;
+
+            if (effectiveReparateurId != null) {
+                Reparateur repa = session.get(Reparateur.class, effectiveReparateurId);
+                if (repa == null) throw new NotFoundException("Réparateur introuvable: " + effectiveReparateurId);
+                assertSameBoutique(user.getBoutique(), repa.getBoutique());
+            } else {
+                // pas de reparateurId demandé
+                if (user instanceof Reparateur) {
+                    effectiveReparateurId = user.getId();
+                }
+                // si propriétaire => null signifie "toute la boutique" (pas juste un réparateur)
+            }
+
+            String q = (query == null) ? "" : query.trim().toLowerCase();
+            boolean hasQ = !q.isBlank();
+
+            // Cas 1 : propriétaire => résultats sur toute la boutique
+            if (user instanceof Proprietaire) {
+                Long boutiqueId = user.getBoutique() == null ? null : user.getBoutique().getId();
+                if (boutiqueId == null) throw new ValidationException("Utilisateur sans boutique.");
+
+                // Construction HQL simple et sûre
+                StringBuilder hql = new StringBuilder();
+                hql.append("select distinct r from Reparation r ")
+                        .append("join r.client c ")
+                        .append("join c.reparateur rr ")
+                        .append("join rr.boutique b ")
+                        .append("where b.id = :bid ");
+
+                if (filtreStatut != null) hql.append("and r.statut = :st ");
+                if (hasQ) hql.append("and lower(c.nom) like :q ");
+                // si reparateurId spécifié même pour proprio => on filtre dessus
+                if (effectiveReparateurId != null) hql.append("and rr.id = :rid ");
+
+                hql.append("order by r.dateCreation desc");
+
+                var queryObj = session.createQuery(hql.toString(), Reparation.class)
+                        .setParameter("bid", boutiqueId);
+
+                if (filtreStatut != null) queryObj.setParameter("st", filtreStatut);
+                if (hasQ) queryObj.setParameter("q", "%" + q + "%");
+                if (effectiveReparateurId != null) queryObj.setParameter("rid", effectiveReparateurId);
+
+                return queryObj.getResultList();
+            }
+
+            // Cas 2 : réparateur => uniquement ses réparations
+            if (user instanceof Reparateur) {
+                Long rid = effectiveReparateurId != null ? effectiveReparateurId : user.getId();
+
+                // sécurité: un réparateur ne peut pas demander les réparations d'un autre
+                if (!rid.equals(user.getId())) {
+                    throw new ValidationException("Accès refusé: un réparateur ne peut voir que ses réparations.");
+                }
+
+                if (filtreStatut != null) {
+                    if (!hasQ) return reparationDao.findByReparateurAndStatut(rid, filtreStatut);
+
+                    return session.createQuery(
+                                    "select r from Reparation r " +
+                                            "where r.client.reparateur.id = :rid " +
+                                            "and r.statut = :st " +
+                                            "and lower(r.client.nom) like :q " +
+                                            "order by r.dateCreation desc",
+                                    Reparation.class
+                            )
+                            .setParameter("rid", rid)
+                            .setParameter("st", filtreStatut)
+                            .setParameter("q", "%" + q + "%")
+                            .getResultList();
+                }
+
+                if (!hasQ) return reparationDao.findByReparateur(rid);
+                return reparationDao.searchByClientName(rid, q);
+            }
+
+            // Autres rôles (si jamais) : interdit
+            throw new ValidationException("Rôle non autorisé pour la recherche de réparations.");
+        });
     }
 
     // -------------------- Helpers --------------------
