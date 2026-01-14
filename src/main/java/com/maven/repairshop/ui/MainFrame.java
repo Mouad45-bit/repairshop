@@ -31,6 +31,11 @@ import com.maven.repairshop.ui.dialogs.SuiviDialog;
  * - Sidebar navigation
  * - Contenu central en CardLayout
  * - Affiche des pages (JPanel)
+ *
+ * IMPORTANT (merge-friendly):
+ * - Lazy pages: on instancie les panels uniquement quand on en a besoin
+ *   => évite les crash si un module backend n’est pas encore mergé.
+ * - Désactivation des boutons si le service backend correspondant est indisponible.
  */
 public class MainFrame extends JFrame {
 
@@ -45,6 +50,13 @@ public class MainFrame extends JFrame {
     private static final String CARD_CLIENTS = "CLIENTS";
     private static final String CARD_CAISSE = "CAISSE";
     private static final String CARD_EMPRUNTS = "EMPRUNTS";
+
+    // Lazy panels
+    private DashboardPanel dashboardPanel;
+    private ReparationsPanel reparationsPanel;
+    private ClientsPanel clientsPanel;
+    private CaissePanel caissePanel;
+    private EmpruntsPanel empruntsPanel;
 
     public MainFrame(SessionContext session) {
         this.session = session;
@@ -108,7 +120,6 @@ public class MainFrame extends JFrame {
         JButton btnCaisse = new JButton("Caisse");
         JButton btnEmprunts = new JButton("Emprunts / Prêts");
 
-        // Bouton Déconnexion
         JButton btnLogout = new JButton("Déconnexion");
 
         // Taille uniforme
@@ -137,29 +148,133 @@ public class MainFrame extends JFrame {
         cardLayout = new CardLayout();
         contentPanel = new JPanel(cardLayout);
 
-        contentPanel.add(new DashboardPanel(session), CARD_DASHBOARD);
-        contentPanel.add(new ReparationsPanel(session), CARD_REPARATIONS);
-        contentPanel.add(new ClientsPanel(session), CARD_CLIENTS);
-        contentPanel.add(new CaissePanel(session), CARD_CAISSE);
-        contentPanel.add(new EmpruntsPanel(session), CARD_EMPRUNTS);
+        // On démarre avec des placeholders (évite d'instancier les pages trop tôt)
+        contentPanel.add(simplePage("Chargement..."), CARD_DASHBOARD);
+        contentPanel.add(simplePage("Module Réparations indisponible."), CARD_REPARATIONS);
+        contentPanel.add(simplePage("Module Clients indisponible."), CARD_CLIENTS);
+        contentPanel.add(simplePage("Chargement..."), CARD_CAISSE);
+        contentPanel.add(simplePage("Chargement..."), CARD_EMPRUNTS);
 
         getContentPane().add(contentPanel, BorderLayout.CENTER);
 
-        // ---- Navigation actions ----
-        btnDashboard.addActionListener(e -> showCard(CARD_DASHBOARD));
-        btnReparations.addActionListener(e -> showCard(CARD_REPARATIONS));
-        btnClients.addActionListener(e -> showCard(CARD_CLIENTS));
-        btnCaisse.addActionListener(e -> showCard(CARD_CAISSE));
-        btnEmprunts.addActionListener(e -> showCard(CARD_EMPRUNTS));
+        // ---- Disponibilité backend (frontend-only) ----
+        boolean repOk = ServiceRegistry.get().isReparationsAvailable();
+        boolean cliOk = ServiceRegistry.get().isClientsAvailable();
+        boolean empOk = ServiceRegistry.get().isEmpruntsAvailable();
 
-        // Option A : Suivi dans un Dialog modal
-        btnSuivi.addActionListener(e -> openSuiviDialog());
+        // Désactiver boutons si module backend absent
+        btnReparations.setEnabled(repOk);
+        btnSuivi.setEnabled(repOk);
+        btnClients.setEnabled(cliOk);
+        btnEmprunts.setEnabled(empOk);
+
+        // Tooltip explicatif (utile pour toi + pour démo)
+        if (!repOk) {
+            btnReparations.setToolTipText("Backend Réparations non mergé (ReparationServiceImpl manquant).");
+            btnSuivi.setToolTipText("Backend Réparations non mergé (ReparationServiceImpl manquant).");
+        }
+        if (!cliOk) {
+            btnClients.setToolTipText("Backend Clients non mergé (ClientServiceImpl manquant).");
+        }
+        if (!empOk) {
+            btnEmprunts.setToolTipText("Backend Emprunts non mergé (EmpruntServiceImpl manquant).");
+        }
+
+        // ---- Navigation actions ----
+        btnDashboard.addActionListener(e -> showDashboard());
+        btnCaisse.addActionListener(e -> showCaisse());
+
+        // Réparations
+        btnReparations.addActionListener(e -> {
+            if (!repOk) {
+                JOptionPane.showMessageDialog(this,
+                        "Module Réparations indisponible.\nMerge le backend correspondant puis relance.",
+                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            showReparations();
+        });
+
+        // Clients
+        btnClients.addActionListener(e -> {
+            if (!cliOk) {
+                JOptionPane.showMessageDialog(this,
+                        "Module Clients indisponible.\nMerge le backend correspondant puis relance.",
+                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            showClients();
+        });
+
+        // Emprunts
+        btnEmprunts.addActionListener(e -> {
+            if (!empOk) {
+                JOptionPane.showMessageDialog(this,
+                        "Module Emprunts / Prêts indisponible.\nMerge le backend correspondant puis relance.",
+                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            showEmprunts();
+        });
+
+        // Suivi
+        btnSuivi.addActionListener(e -> {
+            if (!repOk) {
+                JOptionPane.showMessageDialog(this,
+                        "Module Suivi indisponible.\nMerge le backend Réparations puis relance.",
+                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            openSuiviDialog();
+        });
 
         // Déconnexion
         btnLogout.addActionListener(e -> doLogout());
 
         // Par défaut
+        showDashboard();
+    }
+
+    // --- Lazy show helpers ---
+
+    private void showDashboard() {
+        if (dashboardPanel == null) {
+            dashboardPanel = new DashboardPanel(session);
+            contentPanel.add(dashboardPanel, CARD_DASHBOARD);
+        }
         showCard(CARD_DASHBOARD);
+    }
+
+    private void showReparations() {
+        if (reparationsPanel == null) {
+            reparationsPanel = new ReparationsPanel(session);
+            contentPanel.add(reparationsPanel, CARD_REPARATIONS);
+        }
+        showCard(CARD_REPARATIONS);
+    }
+
+    private void showClients() {
+        if (clientsPanel == null) {
+            clientsPanel = new ClientsPanel(session);
+            contentPanel.add(clientsPanel, CARD_CLIENTS);
+        }
+        showCard(CARD_CLIENTS);
+    }
+
+    private void showCaisse() {
+        if (caissePanel == null) {
+            caissePanel = new CaissePanel(session);
+            contentPanel.add(caissePanel, CARD_CAISSE);
+        }
+        showCard(CARD_CAISSE);
+    }
+
+    private void showEmprunts() {
+        if (empruntsPanel == null) {
+            empruntsPanel = new EmpruntsPanel(session);
+            contentPanel.add(empruntsPanel, CARD_EMPRUNTS);
+        }
+        showCard(CARD_EMPRUNTS);
     }
 
     private void openSuiviDialog() {
