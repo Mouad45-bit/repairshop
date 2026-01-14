@@ -6,6 +6,8 @@ import java.awt.Window;
 
 import javax.swing.*;
 
+import com.maven.repairshop.ui.controllers.UiDialogs;
+
 public class ClientDialog extends JDialog {
 
     public enum Mode { CREATE, EDIT }
@@ -142,11 +144,11 @@ public class ClientDialog extends JDialog {
 
         // Validations UI minimales (les vraies règles restent en service)
         if (nom.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Nom obligatoire.");
+            UiDialogs.warn(this, "Nom obligatoire.");
             return;
         }
         if (tel.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Téléphone obligatoire.");
+            UiDialogs.warn(this, "Téléphone obligatoire.");
             return;
         }
 

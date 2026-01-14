@@ -11,6 +11,7 @@ import javax.swing.*;
 import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.SuiviController;
+import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class SuiviDialog extends JDialog {
@@ -94,7 +95,7 @@ public class SuiviDialog extends JDialog {
 
         Long reparateurId = session.getReparateurId();
         if (reparateurId == null) {
-            JOptionPane.showMessageDialog(this, "Session invalide (réparateur introuvable).");
+            UiDialogs.warn(this, "Session invalide (réparateur introuvable).");
             return;
         }
 

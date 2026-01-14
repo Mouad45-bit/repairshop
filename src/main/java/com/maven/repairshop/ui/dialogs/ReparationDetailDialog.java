@@ -12,6 +12,7 @@ import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.model.enums.StatutReparation;
 import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.ReparationController;
+import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.session.SessionContext;
 
 /**
@@ -153,7 +154,7 @@ public class ReparationDetailDialog extends JDialog {
 
         // Si pas de changement, rien à faire
         if (current.getStatut() == nouveau) {
-            JOptionPane.showMessageDialog(this, "Aucun changement de statut.");
+            UiDialogs.info(this, "Aucun changement de statut.");
             return;
         }
 
@@ -174,7 +175,7 @@ public class ReparationDetailDialog extends JDialog {
         controller.changerStatut(this, reparationId, nouveau, () -> {
             // Recharge après save pour refléter dateDernierStatut, statut, etc.
             loadData();
-            JOptionPane.showMessageDialog(this, "Statut mis à jour.");
+            UiDialogs.info(this, "Statut mis à jour.");
         });
     }
 

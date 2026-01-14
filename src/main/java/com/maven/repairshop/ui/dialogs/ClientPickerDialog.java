@@ -14,12 +14,12 @@ import javax.swing.table.TableColumn;
 import com.maven.repairshop.model.Client;
 import com.maven.repairshop.ui.controllers.ClientController;
 import com.maven.repairshop.ui.controllers.ControllerRegistry;
+import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class ClientPickerDialog extends JDialog {
 
     private final SessionContext session;
-
     private final ClientController controller;
 
     private boolean selected = false;
@@ -137,7 +137,7 @@ public class ClientPickerDialog extends JDialog {
     private void refresh() {
         Long reparateurId = session.getReparateurId();
         if (reparateurId == null) {
-            JOptionPane.showMessageDialog(this, "Session invalide (réparateur introuvable).");
+            UiDialogs.warn(this, "Session invalide (réparateur introuvable).");
             return;
         }
 
@@ -165,13 +165,13 @@ public class ClientPickerDialog extends JDialog {
     private void onChoisir() {
         int row = table.getSelectedRow();
         if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Sélectionne un client.");
+            UiDialogs.warn(this, "Sélectionne un client.");
             return;
         }
 
         Long id = selectedId();
         if (id == null) {
-            JOptionPane.showMessageDialog(this, "Client invalide.");
+            UiDialogs.warn(this, "Client invalide.");
             return;
         }
 

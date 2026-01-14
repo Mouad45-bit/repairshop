@@ -10,6 +10,7 @@ import javax.swing.*;
 import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.ReparationController;
+import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class ReparationFormDialog extends JDialog {
@@ -96,7 +97,7 @@ public class ReparationFormDialog extends JDialog {
 
         Long id = dlg.getPickedId();
         if (id == null) {
-            JOptionPane.showMessageDialog(this, "Client invalide.");
+            UiDialogs.warn(this, "Client invalide.");
             return;
         }
 
@@ -112,13 +113,13 @@ public class ReparationFormDialog extends JDialog {
 
     private void onSave() {
         if (selectedClientId == null || selectedClientId <= 0) {
-            JOptionPane.showMessageDialog(this, "Choisis un client.");
+            UiDialogs.warn(this, "Choisis un client.");
             return;
         }
 
         Long reparateurId = session.getReparateurId();
         if (reparateurId == null) {
-            JOptionPane.showMessageDialog(this, "Session invalide (réparateur introuvable).");
+            UiDialogs.warn(this, "Session invalide (réparateur introuvable).");
             return;
         }
 

@@ -6,6 +6,8 @@ import java.awt.Window;
 
 import javax.swing.*;
 
+import com.maven.repairshop.ui.controllers.UiDialogs;
+
 public class EmpruntDialog extends JDialog {
 
     public enum Mode { CREATE, EDIT }
@@ -142,11 +144,11 @@ public class EmpruntDialog extends JDialog {
         String remarque = txtRemarque.getText() != null ? txtRemarque.getText().trim() : "";
 
         if (personne.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Personne obligatoire.");
+            UiDialogs.warn(this, "Personne obligatoire.");
             return;
         }
         if (montantStr.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Montant obligatoire.");
+            UiDialogs.warn(this, "Montant obligatoire.");
             return;
         }
 
@@ -155,11 +157,11 @@ public class EmpruntDialog extends JDialog {
         try {
             montant = Double.parseDouble(m);
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Montant invalide.");
+            UiDialogs.warn(this, "Montant invalide.");
             return;
         }
         if (montant <= 0) {
-            JOptionPane.showMessageDialog(this, "Le montant doit être > 0.");
+            UiDialogs.warn(this, "Le montant doit être > 0.");
             return;
         }
 
