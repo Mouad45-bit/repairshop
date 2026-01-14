@@ -2,6 +2,7 @@ package com.maven.repairshop.service.impl;
 
 import com.maven.repairshop.dao.base.HibernateTx;
 import com.maven.repairshop.model.Boutique;
+import com.maven.repairshop.model.Proprietaire;
 import com.maven.repairshop.model.Utilisateur;
 import com.maven.repairshop.model.enums.StatutReparation;
 import com.maven.repairshop.service.StatistiquesService;
@@ -19,8 +20,12 @@ public class StatistiquesServiceImpl implements StatistiquesService {
         checkInputs(boutiqueId, from, to, userId);
 
         return HibernateTx.callInTx(session -> {
-            Utilisateur user = session.get(Utilisateur.class, userId);
-            if (user == null) throw new NotFoundException("Utilisateur introuvable: " + userId);
+            Utilisateur user = requireUser(session, userId);
+
+            // règle métier: stats boutique = propriétaire seulement
+            requireProprietaire(user);
+
+            // séparation boutique
             assertSameBoutiqueId(user.getBoutique(), boutiqueId);
 
             Long n = session.createQuery(
@@ -44,8 +49,12 @@ public class StatistiquesServiceImpl implements StatistiquesService {
         checkInputs(boutiqueId, from, to, userId);
 
         return HibernateTx.callInTx(session -> {
-            Utilisateur user = session.get(Utilisateur.class, userId);
-            if (user == null) throw new NotFoundException("Utilisateur introuvable: " + userId);
+            Utilisateur user = requireUser(session, userId);
+
+            // règle métier: stats boutique = propriétaire seulement
+            requireProprietaire(user);
+
+            // séparation boutique
             assertSameBoutiqueId(user.getBoutique(), boutiqueId);
 
             Long terminees = session.createQuery(
@@ -89,8 +98,12 @@ public class StatistiquesServiceImpl implements StatistiquesService {
         checkInputs(boutiqueId, from, to, userId);
 
         return HibernateTx.callInTx(session -> {
-            Utilisateur user = session.get(Utilisateur.class, userId);
-            if (user == null) throw new NotFoundException("Utilisateur introuvable: " + userId);
+            Utilisateur user = requireUser(session, userId);
+
+            // règle métier: stats boutique = propriétaire seulement
+            requireProprietaire(user);
+
+            // séparation boutique
             assertSameBoutiqueId(user.getBoutique(), boutiqueId);
 
             Double sum = session.createQuery(
@@ -109,11 +122,25 @@ public class StatistiquesServiceImpl implements StatistiquesService {
         });
     }
 
+    // -------------------- Helpers --------------------
+
     private void checkInputs(Long boutiqueId, LocalDateTime from, LocalDateTime to, Long userId) {
         if (boutiqueId == null) throw new ValidationException("Boutique obligatoire.");
         if (from == null || to == null) throw new ValidationException("Période obligatoire.");
         if (to.isBefore(from)) throw new ValidationException("Période invalide (to < from).");
         if (userId == null) throw new ValidationException("Utilisateur connecté obligatoire.");
+    }
+
+    private Utilisateur requireUser(org.hibernate.Session session, Long userId) {
+        Utilisateur user = session.get(Utilisateur.class, userId);
+        if (user == null) throw new NotFoundException("Utilisateur introuvable: " + userId);
+        return user;
+    }
+
+    private void requireProprietaire(Utilisateur user) {
+        if (!(user instanceof Proprietaire)) {
+            throw new ValidationException("Accès refusé: statistiques réservées au propriétaire.");
+        }
     }
 
     private void assertSameBoutiqueId(Boutique userBoutique, Long boutiqueId) {
