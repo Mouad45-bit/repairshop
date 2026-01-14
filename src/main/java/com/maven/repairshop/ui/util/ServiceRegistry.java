@@ -61,6 +61,29 @@ public final class ServiceRegistry {
         return reparationService;
     }
 
+    // --- Helpers frontend-only: permettre à l'UI de désactiver un module sans crash ---
+
+    public boolean isEmpruntsAvailable() {
+        return isAvailable(IMPL_EMPRUNT);
+    }
+
+    public boolean isClientsAvailable() {
+        return isAvailable(IMPL_CLIENT);
+    }
+
+    public boolean isReparationsAvailable() {
+        return isAvailable(IMPL_REPARATION);
+    }
+
+    private static boolean isAvailable(String implClassName) {
+        try {
+            Class.forName(implClassName);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
     private static <T> T newInstance(String implClassName, Class<T> type) {
         try {
             Class<?> clazz = Class.forName(implClassName);
@@ -68,8 +91,9 @@ public final class ServiceRegistry {
             return type.cast(obj);
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException(
-                    "Implémentation backend introuvable: " + implClassName
-                            + "\nMerge le module backend correspondant, puis relance.",
+                    "Module backend non disponible.\n"
+                            + "Impl introuvable: " + implClassName + "\n"
+                            + "Action: merge la branche backend correspondante puis relance l'application.",
                     e
             );
         } catch (Exception e) {
