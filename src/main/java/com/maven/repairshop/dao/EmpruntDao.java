@@ -35,4 +35,29 @@ public class EmpruntDao extends BaseDao<Emprunt> {
                         .getResultList()
         );
     }
+
+    public Emprunt findWithReparateurBoutique(Long id) {
+        return HibernateTx.callInTx(session ->
+                session.createQuery(
+                                "select e from Emprunt e " +
+                                        "join fetch e.reparateur r " +
+                                        "left join fetch r.boutique b " +
+                                        "where e.id = :id",
+                                Emprunt.class
+                        )
+                        .setParameter("id", id)
+                        .uniqueResult()
+        );
+    }
+
+    public List<Emprunt> findByBoutique(Long boutiqueId) {
+        return HibernateTx.callInTx(session ->
+                session.createQuery(
+                                "from Emprunt e where e.reparateur.boutique.id = :bid order by e.dateEmprunt desc",
+                                Emprunt.class
+                        )
+                        .setParameter("bid", boutiqueId)
+                        .getResultList()
+        );
+    }
 }

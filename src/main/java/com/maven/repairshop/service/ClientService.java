@@ -9,4 +9,9 @@ public interface ClientService {
     void supprimerClient(Long clientId);
     Client trouverParId(Long clientId);
     List<Client> rechercher(String query, Long reparateurId);
+    Client creerClient(String nom, String telephone, String email, String adresse, String ville, Long reparateurId, Long userId);
+    void modifierClient(Long clientId, String nom, String telephone, String email, String adresse, String ville, Long userId);
+    void supprimerClient(Long clientId, Long userId);
+    Client trouverParId(Long clientId, Long userId);
+    List<Client> rechercher(String query, Long reparateurId, Long userId);
 }
