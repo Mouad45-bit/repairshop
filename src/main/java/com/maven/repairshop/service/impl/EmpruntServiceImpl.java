@@ -18,28 +18,76 @@ public class EmpruntServiceImpl implements EmpruntService {
 
     private final EmpruntDao empruntDao = new EmpruntDao();
 
-    // legacy
+    // ---------------- legacy (fallback pour ne pas casser l’UI) ----------------
+
     @Override
+    @Deprecated
     public Emprunt creer(Long reparateurId, TypeEmprunt type, String personne, double montant, String motif) {
+        // fallback legacy : acteur supposé = reparateurId
         return creer(reparateurId, type, personne, montant, motif, reparateurId);
     }
 
     @Override
+    @Deprecated
     public void changerStatut(Long empruntId, String nouveauStatut) {
-        changerStatut(empruntId, nouveauStatut, null);
+        // fallback legacy : acteur supposé = réparateur de l’emprunt
+        if (empruntId == null) throw new ValidationException("Emprunt obligatoire.");
+
+        Long fallbackUserId = HibernateTx.callInTx(session -> {
+            Emprunt e = session.createQuery(
+                            "select e from Emprunt e " +
+                                    "join fetch e.reparateur r " +
+                                    "where e.id = :id",
+                            Emprunt.class
+                    )
+                    .setParameter("id", empruntId)
+                    .uniqueResult();
+
+            if (e == null) throw new NotFoundException("Emprunt introuvable: " + empruntId);
+            if (e.getReparateur() == null || e.getReparateur().getId() == null) {
+                throw new ValidationException("Emprunt invalide: aucun réparateur.");
+            }
+            return e.getReparateur().getId();
+        });
+
+        changerStatut(empruntId, nouveauStatut, fallbackUserId);
     }
 
     @Override
+    @Deprecated
     public void supprimer(Long empruntId) {
-        supprimer(empruntId, null);
+        // fallback legacy : acteur supposé = réparateur de l’emprunt
+        if (empruntId == null) throw new ValidationException("Emprunt obligatoire.");
+
+        Long fallbackUserId = HibernateTx.callInTx(session -> {
+            Emprunt e = session.createQuery(
+                            "select e from Emprunt e " +
+                                    "join fetch e.reparateur r " +
+                                    "where e.id = :id",
+                            Emprunt.class
+                    )
+                    .setParameter("id", empruntId)
+                    .uniqueResult();
+
+            if (e == null) throw new NotFoundException("Emprunt introuvable: " + empruntId);
+            if (e.getReparateur() == null || e.getReparateur().getId() == null) {
+                throw new ValidationException("Emprunt invalide: aucun réparateur.");
+            }
+            return e.getReparateur().getId();
+        });
+
+        supprimer(empruntId, fallbackUserId);
     }
 
     @Override
+    @Deprecated
     public List<Emprunt> lister(Long reparateurId) {
+        // fallback legacy : acteur supposé = reparateurId
         return lister(reparateurId, reparateurId);
     }
 
-    // sécurisé
+    // ---------------- sécurisé ----------------
+
     @Override
     public Emprunt creer(Long reparateurId, TypeEmprunt type, String personne, double montant, String motif, Long userId) {
         if (reparateurId == null) throw new ValidationException("Réparateur obligatoire.");
@@ -127,7 +175,7 @@ public class EmpruntServiceImpl implements EmpruntService {
                 throw new ValidationException("Retour à EN_COURS interdit.");
             }
 
-            // cahier : EN_COURS -> REMBOURSE (on tolère aussi PARTIELLEMENT_REMBOURSE -> REMBOURSE)
+            // transitions
             if (from == StatutEmprunt.EN_COURS) {
                 if (!(ns == StatutEmprunt.REMBOURSE || ns == StatutEmprunt.PARTIELLEMENT_REMBOURSE)) {
                     throw new ValidationException("Transition refusée: " + from + " -> " + ns);
@@ -152,20 +200,20 @@ public class EmpruntServiceImpl implements EmpruntService {
             Utilisateur user = session.get(Utilisateur.class, userId);
             if (user == null) throw new NotFoundException("Utilisateur introuvable: " + userId);
 
-            Emprunt emprunt = session.get(Emprunt.class, empruntId);
+            Emprunt emprunt = session.createQuery(
+                            "select e from Emprunt e " +
+                                    "join fetch e.reparateur r " +
+                                    "left join fetch r.boutique b " +
+                                    "where e.id = :id",
+                            Emprunt.class
+                    )
+                    .setParameter("id", empruntId)
+                    .uniqueResult();
             if (emprunt == null) throw new NotFoundException("Emprunt introuvable: " + empruntId);
 
-            // load boutique via reparateur
-            Reparateur rep = session.createQuery(
-                            "select r from Reparateur r left join fetch r.boutique b where r.id = :id",
-                            Reparateur.class
-                    )
-                    .setParameter("id", emprunt.getReparateur().getId())
-                    .uniqueResult();
+            assertSameBoutique(user.getBoutique(), emprunt.getReparateur().getBoutique());
 
-            assertSameBoutique(user.getBoutique(), rep.getBoutique());
-
-            if (user instanceof Reparateur && !user.getId().equals(rep.getId())) {
+            if (user instanceof Reparateur && !user.getId().equals(emprunt.getReparateur().getId())) {
                 throw new ValidationException("Accès refusé : emprunt d'un autre réparateur.");
             }
 
@@ -200,6 +248,8 @@ public class EmpruntServiceImpl implements EmpruntService {
 
         return empruntDao.findByReparateur(reparateurId);
     }
+
+    // ---------------- helper ----------------
 
     private void assertSameBoutique(Boutique ub, Boutique tb) {
         Long u = ub == null ? null : ub.getId();
