@@ -39,7 +39,10 @@ public class ProprietaireServiceImpl implements ProprietaireService {
     }
 
     @Override
+    @Deprecated
     public Reparateur creerReparateur(Long boutiqueId, String nom, String login, String rawPassword) {
+        // Legacy: conservée pour ne pas casser l’existant.
+        // IMPORTANT: préférer la version sécurisée avec userId.
         if (boutiqueId == null) throw new ValidationException("Boutique obligatoire.");
         if (nom == null || nom.isBlank()) throw new ValidationException("Nom du réparateur obligatoire.");
         if (login == null || login.isBlank()) throw new ValidationException("Login obligatoire.");
@@ -59,6 +62,46 @@ public class ProprietaireServiceImpl implements ProprietaireService {
         r.setBoutique(b); // obligatoire
 
         utilisateurDao.save(r); // Hibernate persist
+        return r;
+    }
+
+    @Override
+    public Reparateur creerReparateur(Long boutiqueId, String nom, String login, String rawPassword, Long userId) {
+        if (userId == null) throw new ValidationException("Utilisateur connecté obligatoire.");
+        if (boutiqueId == null) throw new ValidationException("Boutique obligatoire.");
+        if (nom == null || nom.isBlank()) throw new ValidationException("Nom du réparateur obligatoire.");
+        if (login == null || login.isBlank()) throw new ValidationException("Login obligatoire.");
+        if (rawPassword == null || rawPassword.isBlank()) throw new ValidationException("Mot de passe obligatoire.");
+
+        Utilisateur u = utilisateurDao.findById(userId);
+        if (u == null) throw new NotFoundException("Utilisateur introuvable: " + userId);
+
+        if (!(u instanceof Proprietaire)) {
+            throw new ValidationException("Seul un propriétaire peut créer un réparateur.");
+        }
+
+        Boutique b = boutiqueDao.findById(boutiqueId);
+        if (b == null) throw new NotFoundException("Boutique introuvable: " + boutiqueId);
+
+        // Sécurité: la boutique doit appartenir au propriétaire connecté
+        if (b.getProprietaire() == null || b.getProprietaire().getId() == null) {
+            throw new ValidationException("Boutique invalide: aucun propriétaire associé.");
+        }
+        if (!b.getProprietaire().getId().equals(userId)) {
+            throw new ValidationException("Accès refusé: vous n'êtes pas propriétaire de cette boutique.");
+        }
+
+        if (utilisateurDao.existsByLogin(login)) {
+            throw new ValidationException("Login déjà utilisé: " + login);
+        }
+
+        Reparateur r = new Reparateur();
+        r.setNom(nom);
+        r.setLogin(login);
+        r.setPassword(PasswordUtil.hash(rawPassword));
+        r.setBoutique(b); // obligatoire
+
+        utilisateurDao.save(r);
         return r;
     }
 }
