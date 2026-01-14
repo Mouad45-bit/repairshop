@@ -13,14 +13,21 @@ import javax.swing.JOptionPane;
 
 import com.maven.repairshop.model.Utilisateur;
 import com.maven.repairshop.ui.session.SessionContext;
-import com.maven.repairshop.ui.util.ServiceRegistry;
 
 /**
  * Login UI (Swing).
  * - Rôle: Propriétaire / Réparateur
  * - Après succès: ouvre MainFrame
+ *
+ * NOTE (merge-friendly):
+ * - Tant que le backend Auth n'est pas mergé, on autorise un bypass DEV.
+ * - Le jour du merge Auth, il suffit de mettre DEV_AUTH_BYPASS à false
+ *   et remplacer le bloc "TODO AUTH" par l'appel réel.
  */
 public class LoginFrame extends JFrame {
+
+    // UI-only: bypass temporaire (à mettre false après merge Auth)
+    private static final boolean DEV_AUTH_BYPASS = true;
 
     private JPanel contentPane;
     private JTextField txtLogin;
@@ -86,23 +93,26 @@ public class LoginFrame extends JFrame {
         }
 
         try {
-            // IMPORTANT :
-            // Pour l'instant, on n'a pas encore AuthService câblé dans ServiceRegistry.
-            // Donc 2 options :
-            // (A) si vous avez déjà AuthService dans le backend, on l'appelle ici
-            // (B) sinon on met un faux login temporaire (mode maquette)
-            //
-            // Je te fais la version PRO (A) dès que AuthService est prêt.
-            //
-            // TEMP: message clair
+            // --------------------
+            // MODE DEV (frontend-only)
+            // --------------------
+            if (DEV_AUTH_BYPASS) {
+                SessionContext session = createDevSession(login);
+                openMain(session);
+                return;
+            }
+
+            // --------------------
+            // TODO AUTH (après merge backend Auth)
+            // --------------------
             JOptionPane.showMessageDialog(this,
                     "AuthService pas encore branché.\n" +
-                    "Dès que le module Auth est livré, on remplace ce bloc par authService.login().",
+                    "Après merge backend, remplacer ce bloc par authService.login().",
                     "Info",
                     JOptionPane.INFORMATION_MESSAGE);
 
-            // Exemple futur (quand AuthService existe) :
-            // Utilisateur u = ServiceRegistry.get().authService().login(login, password);
+            // Exemple futur:
+            // Utilisateur u = ServiceRegistry.get().auth().login(login, password);
             // SessionContext session = SessionContext.fromUser(u);
             // openMain(session);
 
@@ -112,6 +122,30 @@ public class LoginFrame extends JFrame {
                     "Connexion échouée",
                     JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    /**
+     * Création d'une session "dev" sans backend Auth.
+     * IMPORTANT: on ne touche pas le backend; on crée un Utilisateur minimal côté UI.
+     */
+    private SessionContext createDevSession(String login) {
+        // Choix simple: si le login contient "prop" => PROPRIETAIRE, sinon REPARATEUR
+        boolean isOwner = login.toLowerCase().contains("prop");
+
+        Utilisateur u = new Utilisateur();
+        u.setLogin(login);
+
+        // Adaptation: selon ton modèle Utilisateur/Role
+        // Si tu as un enum Role, adapte ici.
+        // On essaye de rester minimal:
+        if (isOwner) {
+            u.setRole("PROPRIETAIRE");
+        } else {
+            u.setRole("REPARATEUR");
+        }
+
+        // Si SessionContext.fromUser(u) existe déjà, c'est parfait:
+        return SessionContext.fromUser(u);
     }
 
     private void openMain(SessionContext session) {
