@@ -13,30 +13,78 @@ public class ClientServiceImpl implements ClientService {
 
     private final ClientDao clientDao = new ClientDao();
 
-    // ---------- legacy (on garde, mais sans sécurité forte) ----------
+    // ---------- legacy (on garde, fallback pour ne pas casser l’UI) ----------
     @Override
+    @Deprecated
     public Client creerClient(String nom, String telephone, String email, String adresse, String ville, Long reparateurId) {
+        // fallback legacy : on suppose que l'acteur est le réparateur cible
         return creerClient(nom, telephone, email, adresse, ville, reparateurId, reparateurId);
     }
 
     @Override
+    @Deprecated
     public void modifierClient(Long clientId, String nom, String telephone, String email, String adresse, String ville) {
-        modifierClient(clientId, nom, telephone, email, adresse, ville, null);
+        // fallback legacy : on agit comme si l'acteur était le réparateur du client
+        if (clientId == null) throw new ValidationException("Client obligatoire.");
+        if (nom == null || nom.isBlank()) throw new ValidationException("Nom obligatoire.");
+
+        Long fallbackUserId = HibernateTx.callInTx(session -> {
+            Client c = loadClientWithReparateurBoutique(session, clientId);
+            if (c == null) throw new NotFoundException("Client introuvable: " + clientId);
+            if (c.getReparateur() == null || c.getReparateur().getId() == null) {
+                throw new ValidationException("Client invalide: aucun réparateur.");
+            }
+            return c.getReparateur().getId();
+        });
+
+        // NOTE: ce fallback ne garantit pas la sécurité complète (pas d'user connecté),
+        // mais évite de casser l’existant.
+        modifierClient(clientId, nom, telephone, email, adresse, ville, fallbackUserId);
     }
 
     @Override
+    @Deprecated
     public void supprimerClient(Long clientId) {
-        supprimerClient(clientId, null);
+        // fallback legacy : on agit comme si l'acteur était le réparateur du client
+        if (clientId == null) throw new ValidationException("Client obligatoire.");
+
+        Long fallbackUserId = HibernateTx.callInTx(session -> {
+            Client c = loadClientWithReparateurBoutique(session, clientId);
+            if (c == null) throw new NotFoundException("Client introuvable: " + clientId);
+            if (c.getReparateur() == null || c.getReparateur().getId() == null) {
+                throw new ValidationException("Client invalide: aucun réparateur.");
+            }
+            return c.getReparateur().getId();
+        });
+
+        supprimerClient(clientId, fallbackUserId);
     }
 
     @Override
+    @Deprecated
     public Client trouverParId(Long clientId) {
-        return trouverParId(clientId, null);
+        // fallback legacy : on renvoie le client chargé (sans contrôle user),
+        // mais on tente de rester cohérent en passant par l’acteur = réparateur du client.
+        if (clientId == null) throw new ValidationException("Client obligatoire.");
+
+        Long fallbackUserId = HibernateTx.callInTx(session -> {
+            Client c = loadClientWithReparateurBoutique(session, clientId);
+            if (c == null) throw new NotFoundException("Client introuvable: " + clientId);
+            if (c.getReparateur() == null || c.getReparateur().getId() == null) {
+                throw new ValidationException("Client invalide: aucun réparateur.");
+            }
+            return c.getReparateur().getId();
+        });
+
+        return trouverParId(clientId, fallbackUserId);
     }
 
     @Override
+    @Deprecated
     public List<Client> rechercher(String query, Long reparateurId) {
-        return rechercher(query, reparateurId, null);
+        // fallback legacy : on suppose acteur = réparateurId (comme avant)
+        if (reparateurId == null) throw new ValidationException("Réparateur obligatoire.");
+        return rechercher(query, reparateurId, reparateurId);
     }
 
     // --------------------- sécurisé ---------------------
