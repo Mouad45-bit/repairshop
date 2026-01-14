@@ -24,6 +24,17 @@ public final class UiDialogs {
     }
 
     public static void handle(Component parent, Throwable ex) {
+        if (ex == null) {
+            error(parent, "Erreur inattendue.");
+            return;
+        }
+
+        // Validation "UI-friendly" (souvent utilisé dans controllers)
+        if (ex instanceof IllegalArgumentException) {
+            warn(parent, ex.getMessage());
+            return;
+        }
+
         if (ex instanceof ValidationException) {
             warn(parent, ex.getMessage());
             return;
@@ -36,6 +47,7 @@ public final class UiDialogs {
             warn(parent, ex.getMessage());
             return;
         }
+
         error(parent, "Erreur inattendue: " + ex.getMessage());
         ex.printStackTrace();
     }
