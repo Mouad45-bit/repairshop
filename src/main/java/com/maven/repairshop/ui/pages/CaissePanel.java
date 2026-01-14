@@ -114,11 +114,24 @@ public class CaissePanel extends JPanel {
             return;
         }
 
-        LocalDate from = parseDateOrNull(txtDateDebut.getText());
-        LocalDate to = parseDateOrNull(txtDateFin.getText());
+        LocalDate from = parseDateOrNull(txtDateDebut.getText(), "Date début");
+        if (from == INVALID_DATE) return;
 
-        // On récupère la liste via le controller
-        empruntCtrl.lister(this, reparateurId, list -> fillFromEmprunts(list, from, to));
+        LocalDate to = parseDateOrNull(txtDateFin.getText(), "Date fin");
+        if (to == INVALID_DATE) return;
+
+        // Optional: si from > to => warning + stop
+        if (from != null && to != null && from.isAfter(to)) {
+            UiDialogs.warn(this, "Période invalide: la date début est après la date fin.");
+            return;
+        }
+
+        try {
+            // On récupère la liste via le controller
+            empruntCtrl.lister(this, reparateurId, list -> fillFromEmprunts(list, from, to));
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private void fillFromEmprunts(List<Emprunt> list, LocalDate from, LocalDate to) {
@@ -145,12 +158,15 @@ public class CaissePanel extends JPanel {
             if (!safe(e.getMotif()).isEmpty()) desc += " — " + safe(e.getMotif());
 
             double montant = e.getMontant();
-            String montantStr = (isEntree ? "+" : "-") + formatDh(Math.abs(montant));
+            double abs = Math.abs(montant);
+
+            String montantStr = (isEntree ? "+" : "-") + formatDh(abs);
 
             model.addRow(new Object[] { dateStr, type, categorie, desc, montantStr });
 
-            if (isEntree) entrees += montant;
-            else sorties += montant;
+            // Totaux: on cumule en positif
+            if (isEntree) entrees += abs;
+            else sorties += abs;
         }
 
         double solde = entrees - sorties;
@@ -160,15 +176,18 @@ public class CaissePanel extends JPanel {
         lblSolde.setText("Solde: " + formatDh(solde));
     }
 
-    private LocalDate parseDateOrNull(String s) {
+    // Trick: on renvoie un marqueur spécial pour dire "date invalide"
+    private static final LocalDate INVALID_DATE = LocalDate.of(1900, 1, 1);
+
+    private LocalDate parseDateOrNull(String s, String fieldName) {
         if (s == null) return null;
         String t = s.trim();
         if (t.isEmpty()) return null;
         try {
             return LocalDate.parse(t); // ISO yyyy-MM-dd
         } catch (Exception ex) {
-            UiDialogs.warn(this, "Date invalide: " + t + " (format attendu: YYYY-MM-DD)");
-            return null;
+            UiDialogs.warn(this, fieldName + " invalide: " + t + " (format attendu: YYYY-MM-DD)");
+            return INVALID_DATE;
         }
     }
 

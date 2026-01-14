@@ -130,10 +130,14 @@ public class EmpruntsPanel extends JPanel {
                     JOptionPane.YES_NO_OPTION);
 
             if (ok == JOptionPane.YES_OPTION) {
-                ctrl.changerStatut(this, id, StatutEmprunt.REMBOURSE.name(), () -> {
-                    UiDialogs.info(this, "Statut mis à jour.");
-                    refresh();
-                });
+                try {
+                    ctrl.changerStatut(this, id, StatutEmprunt.REMBOURSE.name(), () -> {
+                        UiDialogs.info(this, "Statut mis à jour.");
+                        refresh();
+                    });
+                } catch (Exception ex) {
+                    UiDialogs.handle(this, ex);
+                }
             }
         });
 
@@ -147,10 +151,14 @@ public class EmpruntsPanel extends JPanel {
                     JOptionPane.YES_NO_OPTION);
             if (ok != JOptionPane.YES_OPTION) return;
 
-            ctrl.supprimer(this, id, () -> {
-                UiDialogs.info(this, "Supprimé.");
-                refresh();
-            });
+            try {
+                ctrl.supprimer(this, id, () -> {
+                    UiDialogs.info(this, "Supprimé.");
+                    refresh();
+                });
+            } catch (Exception ex) {
+                UiDialogs.handle(this, ex);
+            }
         });
 
         btnSearch.addActionListener(e -> refresh());
@@ -173,22 +181,26 @@ public class EmpruntsPanel extends JPanel {
             return;
         }
 
-        EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this));
-        dlg.setModeCreate();
-        dlg.setVisible(true);
+        try {
+            EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this));
+            dlg.setModeCreate();
+            dlg.setVisible(true);
 
-        if (!dlg.isSaved()) return;
+            if (!dlg.isSaved()) return;
 
-        EmpruntDialog.EmpruntFormData data = dlg.getFormData();
-        if (data == null) return;
+            EmpruntDialog.EmpruntFormData data = dlg.getFormData();
+            if (data == null) return;
 
-        TypeEmprunt type = "PRET".equalsIgnoreCase(data.type) ? TypeEmprunt.PRET : TypeEmprunt.EMPRUNT;
+            TypeEmprunt type = "PRET".equalsIgnoreCase(data.type) ? TypeEmprunt.PRET : TypeEmprunt.EMPRUNT;
 
-        // create() n'accepte pas date/statut => statut = EN_COURS par défaut côté service
-        ctrl.creer(this, reparateurId, type, data.personne, data.montantStr, data.remarque, created -> {
-            UiDialogs.info(this, "Ajout OK.");
-            refresh();
-        });
+            // create() n'accepte pas date/statut => statut = EN_COURS par défaut côté service
+            ctrl.creer(this, reparateurId, type, data.personne, data.montantStr, data.remarque, created -> {
+                UiDialogs.info(this, "Ajout OK.");
+                refresh();
+            });
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private void refresh() {
@@ -198,14 +210,18 @@ public class EmpruntsPanel extends JPanel {
             return;
         }
 
-        ctrl.lister(this, reparateurId, list -> {
-            List<Object[]> rows = toRowsFiltered(list);
+        try {
+            ctrl.lister(this, reparateurId, list -> {
+                List<Object[]> rows = toRowsFiltered(list);
 
-            model.setRowCount(0);
-            for (Object[] r : rows) model.addRow(r);
+                model.setRowCount(0);
+                for (Object[] r : rows) model.addRow(r);
 
-            updateTotalsFromRows(rows);
-        });
+                updateTotalsFromRows(rows);
+            });
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private List<Object[]> toRowsFiltered(List<Emprunt> list) {
@@ -284,16 +300,14 @@ public class EmpruntsPanel extends JPanel {
         String statut = safe(model.getValueAt(row, 5));
         String motif = safe(model.getValueAt(row, 6));
 
-        JOptionPane.showMessageDialog(this,
+        UiDialogs.info(this,
                 "Emprunt/Prêt #" + id + "\n" +
                 "Type: " + type + "\n" +
                 "Personne: " + personne + "\n" +
                 "Montant: " + montant + "\n" +
                 "Date: " + date + "\n" +
                 "Statut: " + statut + "\n" +
-                "Motif: " + motif,
-                "Détail",
-                JOptionPane.INFORMATION_MESSAGE);
+                "Motif: " + motif);
     }
 
     private Long getSelectedId() {

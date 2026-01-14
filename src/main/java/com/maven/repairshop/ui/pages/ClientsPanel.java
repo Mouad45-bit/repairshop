@@ -106,7 +106,11 @@ public class ClientsPanel extends JPanel {
         String q = txtSearch.getText() == null ? "" : txtSearch.getText().trim();
 
         // Contract backend: rechercher(query, reparateurId)
-        ctrl.rechercher(this, q, reparateurId, this::fillTable);
+        try {
+            ctrl.rechercher(this, q, reparateurId, this::fillTable);
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private void fillTable(java.util.List<Client> list) {
@@ -130,22 +134,26 @@ public class ClientsPanel extends JPanel {
             return;
         }
 
-        ClientDialog dlg = new ClientDialog(SwingUtilities.getWindowAncestor(this));
-        dlg.setModeCreate();
-        dlg.setVisible(true);
+        try {
+            ClientDialog dlg = new ClientDialog(SwingUtilities.getWindowAncestor(this));
+            dlg.setModeCreate();
+            dlg.setVisible(true);
 
-        if (!dlg.isSaved()) return;
+            if (!dlg.isSaved()) return;
 
-        ClientDialog.ClientFormData data = dlg.getFormData();
-        if (data == null) return;
+            ClientDialog.ClientFormData data = dlg.getFormData();
+            if (data == null) return;
 
-        ctrl.creer(this,
-                data.nom, data.telephone, data.email, data.adresse, data.ville,
-                reparateurId,
-                created -> {
-                    UiDialogs.info(this, "Client ajouté.");
-                    refresh();
-                });
+            ctrl.creer(this,
+                    data.nom, data.telephone, data.email, data.adresse, data.ville,
+                    reparateurId,
+                    created -> {
+                        UiDialogs.info(this, "Client ajouté.");
+                        refresh();
+                    });
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private void editClient() {
@@ -159,21 +167,25 @@ public class ClientsPanel extends JPanel {
         String oldAdresse = safe(model.getValueAt(row, 4));
         String oldVille = safe(model.getValueAt(row, 5));
 
-        ClientDialog dlg = new ClientDialog(SwingUtilities.getWindowAncestor(this));
-        dlg.setModeEdit(id, oldNom, oldTel, oldEmail, oldAdresse, oldVille);
-        dlg.setVisible(true);
+        try {
+            ClientDialog dlg = new ClientDialog(SwingUtilities.getWindowAncestor(this));
+            dlg.setModeEdit(id, oldNom, oldTel, oldEmail, oldAdresse, oldVille);
+            dlg.setVisible(true);
 
-        if (!dlg.isSaved()) return;
+            if (!dlg.isSaved()) return;
 
-        ClientDialog.ClientFormData data = dlg.getFormData();
-        if (data == null) return;
+            ClientDialog.ClientFormData data = dlg.getFormData();
+            if (data == null) return;
 
-        ctrl.modifier(this, id,
-                data.nom, data.telephone, data.email, data.adresse, data.ville,
-                () -> {
-                    UiDialogs.info(this, "Client modifié.");
-                    refresh();
-                });
+            ctrl.modifier(this, id,
+                    data.nom, data.telephone, data.email, data.adresse, data.ville,
+                    () -> {
+                        UiDialogs.info(this, "Client modifié.");
+                        refresh();
+                    });
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private void deleteClient() {
@@ -188,10 +200,14 @@ public class ClientsPanel extends JPanel {
         );
         if (ok != JOptionPane.YES_OPTION) return;
 
-        ctrl.supprimer(this, id, () -> {
-            UiDialogs.info(this, "Client supprimé.");
-            refresh();
-        });
+        try {
+            ctrl.supprimer(this, id, () -> {
+                UiDialogs.info(this, "Client supprimé.");
+                refresh();
+            });
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private void showDetail() {
@@ -205,18 +221,14 @@ public class ClientsPanel extends JPanel {
         String adresse = safe(model.getValueAt(row, 4));
         String ville = safe(model.getValueAt(row, 5));
 
-        JOptionPane.showMessageDialog(
-                this,
+        UiDialogs.info(this,
                 "Client #" + id + "\n" +
                 "Nom: " + nom + "\n" +
                 "Téléphone: " + tel + "\n" +
                 "Email: " + email + "\n" +
                 "Adresse: " + adresse + "\n" +
                 "Ville: " + ville + "\n\n" +
-                "(Plus tard: ouvrir un vrai écran détail + historique réparations.)",
-                "Détail client",
-                JOptionPane.INFORMATION_MESSAGE
-        );
+                "(Plus tard: ouvrir un vrai écran détail + historique réparations.)");
     }
 
     private Long getSelectedId() {

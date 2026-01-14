@@ -16,6 +16,7 @@ import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.model.enums.StatutReparation;
 import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.ReparationController;
+import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.dialogs.ReparationDetailDialog;
 import com.maven.repairshop.ui.dialogs.ReparationFormDialog;
 import com.maven.repairshop.ui.session.SessionContext;
@@ -150,14 +151,18 @@ public class ReparationsPanel extends JPanel {
     private void refresh() {
         Long reparateurId = session.getReparateurId();
         if (reparateurId == null) {
-            JOptionPane.showMessageDialog(this, "Session invalide (réparateur introuvable).");
+            UiDialogs.warn(this, "Session invalide (réparateur introuvable).");
             return;
         }
 
         String query = txtRecherche.getText();
         StatutReparation statut = selectedStatutOrNull();
 
-        controller.rechercher(this, query, reparateurId, statut, this::fillTable);
+        try {
+            controller.rechercher(this, query, reparateurId, statut, this::fillTable);
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private void fillTable(List<Reparation> list) {
@@ -175,37 +180,45 @@ public class ReparationsPanel extends JPanel {
     }
 
     private void onAjouter() {
-        Window w = SwingUtilities.getWindowAncestor(this);
-        ReparationFormDialog dlg = new ReparationFormDialog(w, session);
-        dlg.setVisible(true);
+        try {
+            Window w = SwingUtilities.getWindowAncestor(this);
+            ReparationFormDialog dlg = new ReparationFormDialog(w, session);
+            dlg.setVisible(true);
 
-        if (!dlg.isSaved()) return;
+            if (!dlg.isSaved()) return;
 
-        // Refresh liste
-        refresh();
+            // Refresh liste
+            refresh();
 
-        // Option UX : ouvrir directement le détail de la nouvelle réparation
-        Reparation created = dlg.getCreated();
-        if (created != null && created.getId() != null) {
-            new ReparationDetailDialog(w, session, created.getId()).setVisible(true);
+            // Option UX : ouvrir directement le détail de la nouvelle réparation
+            Reparation created = dlg.getCreated();
+            if (created != null && created.getId() != null) {
+                new ReparationDetailDialog(w, session, created.getId()).setVisible(true);
+            }
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
         }
     }
 
     private void onDetail() {
         Long id = selectedId();
         if (id == null) {
-            JOptionPane.showMessageDialog(this, "Sélectionne une réparation d'abord.");
+            UiDialogs.warn(this, "Sélectionne une réparation d'abord.");
             return;
         }
 
-        Window w = SwingUtilities.getWindowAncestor(this);
-        new ReparationDetailDialog(w, session, id).setVisible(true);
+        try {
+            Window w = SwingUtilities.getWindowAncestor(this);
+            new ReparationDetailDialog(w, session, id).setVisible(true);
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private void onChangerStatut() {
         Long id = selectedId();
         if (id == null) {
-            JOptionPane.showMessageDialog(this, "Sélectionne une réparation d'abord.");
+            UiDialogs.warn(this, "Sélectionne une réparation d'abord.");
             return;
         }
 
@@ -227,13 +240,17 @@ public class ReparationsPanel extends JPanel {
         StatutReparation nouveau = (StatutReparation) cb.getSelectedItem();
         if (nouveau == null) return;
 
-        controller.changerStatut(this, id, nouveau, this::refresh);
+        try {
+            controller.changerStatut(this, id, nouveau, this::refresh);
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     private void onAnnuler() {
         Long id = selectedId();
         if (id == null) {
-            JOptionPane.showMessageDialog(this, "Sélectionne une réparation d'abord.");
+            UiDialogs.warn(this, "Sélectionne une réparation d'abord.");
             return;
         }
 
@@ -245,7 +262,11 @@ public class ReparationsPanel extends JPanel {
         );
         if (ok != JOptionPane.YES_OPTION) return;
 
-        controller.changerStatut(this, id, StatutReparation.ANNULEE, this::refresh);
+        try {
+            controller.changerStatut(this, id, StatutReparation.ANNULEE, this::refresh);
+        } catch (Exception ex) {
+            UiDialogs.handle(this, ex);
+        }
     }
 
     // ---------------- Helpers ----------------
