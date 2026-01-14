@@ -11,46 +11,57 @@ import com.maven.repairshop.ui.util.ServiceRegistry;
  * Règles:
  * - Ne dépend que des interfaces service (contracts backend).
  * - Les impl concrètes sont fournies par ServiceRegistry (chargement backend).
+ *
+ * IMPORTANT (merge-friendly):
+ * - Lazy init: on ne construit les controllers que lorsqu’ils sont demandés.
+ *   => évite de casser l'app au démarrage si un module backend n’est pas encore mergé.
  */
 public final class ControllerRegistry {
 
     private static final ControllerRegistry INSTANCE = new ControllerRegistry();
 
-    private final ReparationController reparationController;
-    private final SuiviController suiviController;
-    private final EmpruntController empruntController;
-    private final ClientController clientController;
+    private ReparationController reparationController;
+    private SuiviController suiviController;
+    private EmpruntController empruntController;
+    private ClientController clientController;
 
     private ControllerRegistry() {
-        // services (contracts) depuis ServiceRegistry (backend)
-        ReparationService reparationService = ServiceRegistry.get().reparations();
-        EmpruntService empruntService = ServiceRegistry.get().emprunts();
-        ClientService clientService = ServiceRegistry.get().clients();
-
-        // controllers UI
-        this.reparationController = new ReparationController(reparationService);
-        this.suiviController = new SuiviController(reparationService); // même service
-        this.empruntController = new EmpruntController(empruntService);
-        this.clientController = new ClientController(clientService);
+        // Lazy init: ne rien instancier ici
     }
 
     public static ControllerRegistry get() {
         return INSTANCE;
     }
 
-    public ReparationController reparations() {
+    public synchronized ReparationController reparations() {
+        if (reparationController == null) {
+            ReparationService reparationService = ServiceRegistry.get().reparations();
+            this.reparationController = new ReparationController(reparationService);
+        }
         return reparationController;
     }
 
-    public SuiviController suivi() {
+    public synchronized SuiviController suivi() {
+        if (suiviController == null) {
+            ReparationService reparationService = ServiceRegistry.get().reparations();
+            this.suiviController = new SuiviController(reparationService);
+        }
         return suiviController;
     }
 
-    public EmpruntController emprunts() {
+    public synchronized EmpruntController emprunts() {
+        if (empruntController == null) {
+            EmpruntService empruntService = ServiceRegistry.get().emprunts();
+            this.empruntController = new EmpruntController(empruntService);
+        }
         return empruntController;
     }
 
-    public ClientController clients() {
+    public synchronized ClientController clients() {
+        if (clientController == null) {
+            ClientService clientService = ServiceRegistry.get().clients();
+            this.clientController = new ClientController(clientService);
+        }
         return clientController;
     }
 }
