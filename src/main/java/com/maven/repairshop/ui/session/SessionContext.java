@@ -72,6 +72,32 @@ public final class SessionContext {
         throw new IllegalStateException("Type Utilisateur non supporté : " + u.getClass().getName());
     }
 
+    /**
+     * Session DEV (frontend-only).
+     * Permet de lancer l'UI sans backend Auth.
+     * À utiliser uniquement tant que le module Auth n'est pas mergé.
+     */
+    public static SessionContext dev(Role role, String login) {
+        if (role == null) throw new IllegalArgumentException("Role null");
+        if (login == null || login.trim().isEmpty()) throw new IllegalArgumentException("Login vide");
+
+        // IDs DEV (stables)
+        Long userId = 1L;
+        Long boutiqueId = 1L;
+
+        Long proprietaireId = (role == Role.PROPRIETAIRE) ? 1L : null;
+        Long reparateurId = (role == Role.REPARATEUR) ? 1L : null;
+
+        return new SessionContext(
+                userId,
+                login.trim(),
+                role,
+                boutiqueId,
+                proprietaireId,
+                reparateurId
+        );
+    }
+
     public Long getUserId() { return userId; }
     public String getLogin() { return login; }
     public Role getRole() { return role; }
