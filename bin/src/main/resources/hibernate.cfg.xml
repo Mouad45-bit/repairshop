@@ -1,0 +1,39 @@
+<!DOCTYPE hibernate-configuration PUBLIC
+        "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+        "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
+<hibernate-configuration>
+    <session-factory>
+
+        <!-- Connexion MySQL -->
+        <property name="hibernate.connection.driver_class">com.mysql.cj.jdbc.Driver</property>
+        <property name="hibernate.connection.url">
+            jdbc:mysql://localhost:3306/repairshop?useSSL=false&amp;serverTimezone=UTC&amp;allowPublicKeyRetrieval=true
+        </property>
+        <property name="hibernate.connection.username">repairuser</property>
+        <property name="hibernate.connection.password">secret123</property>
+
+        <!-- Dialecte -->
+        <property name="hibernate.dialect">org.hibernate.dialect.MySQLDialect</property>
+
+        <!-- Gestion du schéma en dev -->
+        <property name="hibernate.hbm2ddl.auto">update</property>
+        <!-- options: validate | update | create | create-drop -->
+
+        <!-- Logs SQL -->
+        <property name="show_sql">true</property>
+        <property name="format_sql">true</property>
+
+        <!-- Déclaration des entités -->
+        <mapping class="com.maven.repairshop.model.Utilisateur"/>
+        <mapping class="com.maven.repairshop.model.Proprietaire"/>
+        <mapping class="com.maven.repairshop.model.Reparateur"/>
+        <mapping class="com.maven.repairshop.model.Boutique"/>
+        <mapping class="com.maven.repairshop.model.Client"/>
+        <mapping class="com.maven.repairshop.model.Reparation"/>
+        <mapping class="com.maven.repairshop.model.Paiement"/>
+        <mapping class="com.maven.repairshop.model.Cause"/>
+        <mapping class="com.maven.repairshop.model.Appareil"/>
+        <mapping class="com.maven.repairshop.model.Emprunt"/>
+
+    </session-factory>
+</hibernate-configuration>
