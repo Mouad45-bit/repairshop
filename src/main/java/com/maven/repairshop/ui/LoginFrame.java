@@ -9,8 +9,8 @@ import javax.swing.JLabel;
 import javax.swing.JTextField;
 import javax.swing.JPasswordField;
 import javax.swing.JButton;
-import javax.swing.JOptionPane;
 
+import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.session.SessionContext;
 
 /**
@@ -83,10 +83,7 @@ public class LoginFrame extends JFrame {
         String password = new String(txtPassword.getPassword());
 
         if (login.isEmpty() || password.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "Veuillez saisir le login et le mot de passe.",
-                    "Champs obligatoires",
-                    JOptionPane.WARNING_MESSAGE);
+            UiDialogs.warn(this, "Veuillez saisir le login et le mot de passe.");
             return;
         }
 
@@ -106,17 +103,13 @@ public class LoginFrame extends JFrame {
             }
 
             // Quand le backend Auth sera mergé, on remplacera ceci par authService.login()
-            JOptionPane.showMessageDialog(this,
+            UiDialogs.info(this,
                     "AuthService pas encore branché.\n" +
-                            "Après merge backend, on remplacera ce bloc par authService.login().",
-                    "Info",
-                    JOptionPane.INFORMATION_MESSAGE);
+                    "Après merge backend, on remplacera ce bloc par authService.login().");
 
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                    ex.getMessage(),
-                    "Connexion échouée",
-                    JOptionPane.ERROR_MESSAGE);
+            // cohérent avec le reste
+            UiDialogs.handle(this, ex);
         }
     }
 
