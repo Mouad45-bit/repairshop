@@ -1,336 +1,195 @@
 package com.maven.repairshop.ui.pages;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
 import java.awt.FlowLayout;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.Window;
 
-import javax.swing.*;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
-import com.maven.repairshop.model.Emprunt;
-import com.maven.repairshop.model.enums.StatutEmprunt;
-import com.maven.repairshop.model.enums.TypeEmprunt;
-import com.maven.repairshop.ui.controllers.ControllerRegistry;
-import com.maven.repairshop.ui.controllers.EmpruntController;
 import com.maven.repairshop.ui.controllers.UiDialogs;
-import com.maven.repairshop.ui.dialogs.EmpruntDialog;
+import com.maven.repairshop.ui.dialogs.EmpruntDialog; // Import Correct
 import com.maven.repairshop.ui.session.SessionContext;
 
 public class EmpruntsPanel extends JPanel {
 
     private final SessionContext session;
 
-    // controller via registry (UI -> ServiceRegistry -> backend)
-    private final EmpruntController ctrl = ControllerRegistry.get().emprunts();
+    // --- DESIGN CONSTANTS ---
+    private final Color MAIN_COLOR = new Color(44, 185, 152);
+    private final Color BG_APP = new Color(240, 242, 245);
+    private final Color CARD_SHADOW = new Color(200, 200, 200, 80);
 
     private JTable table;
     private DefaultTableModel model;
-
     private JTextField txtSearch;
-    private JComboBox<Object> cbType;
-    private JComboBox<Object> cbStatut;
-
-    private JLabel lblTotalEmprunts;
-    private JLabel lblTotalPrets;
-
-    private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public EmpruntsPanel(SessionContext session) {
         this.session = session;
         initUi();
-        refresh();
+        fillMockData();
     }
 
     private void initUi() {
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(25, 25));
+        setBackground(BG_APP);
+        setBorder(new EmptyBorder(25, 25, 25, 25));
 
-        // ===== TOP (filtres + ajouter) =====
-        JPanel top = new JPanel(new BorderLayout());
+        // 1. HEADER
+        JPanel headerPanel = new JPanel(new BorderLayout(0, 15));
+        headerPanel.setOpaque(false);
 
-        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        txtSearch = new JTextField(16);
+        JLabel lblTitle = new JLabel("Gestion des Prêts & Emprunts (Design)");
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        lblTitle.setForeground(new Color(40, 40, 40));
+        headerPanel.add(lblTitle, BorderLayout.NORTH);
 
-        cbType = new JComboBox<>();
-        cbType.addItem("Tous");
-        for (TypeEmprunt t : TypeEmprunt.values()) cbType.addItem(t);
+        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        toolbar.setOpaque(false);
 
-        cbStatut = new JComboBox<>();
-        cbStatut.addItem("Tous");
-        for (StatutEmprunt s : StatutEmprunt.values()) cbStatut.addItem(s);
+        txtSearch = new JTextField(20);
+        styleInput(txtSearch);
 
-        JButton btnSearch = new JButton("Rechercher");
-        JButton btnRefresh = new JButton("Actualiser");
+        JButton btnSearch = createButton("🔍 Rechercher", MAIN_COLOR);
+        JButton btnAdd = createButton("➕ Nouveau Prêt/Avance", new Color(155, 89, 182)); // Violet
 
-        left.add(new JLabel("Personne / Motif:"));
-        left.add(txtSearch);
-        left.add(new JLabel("Type:"));
-        left.add(cbType);
-        left.add(new JLabel("Statut:"));
-        left.add(cbStatut);
-        left.add(btnSearch);
-        left.add(btnRefresh);
+        toolbar.add(new JLabel("Recherche:"));
+        toolbar.add(txtSearch);
+        toolbar.add(btnSearch);
+        toolbar.add(new JLabel("     "));
+        toolbar.add(btnAdd);
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnAdd = new JButton("+ Ajouter");
-        right.add(btnAdd);
+        headerPanel.add(toolbar, BorderLayout.CENTER);
+        add(headerPanel, BorderLayout.NORTH);
 
-        top.add(left, BorderLayout.CENTER);
-        top.add(right, BorderLayout.EAST);
-
-        add(top, BorderLayout.NORTH);
-
-        // ===== TABLE =====
-        model = new DefaultTableModel(
-                new Object[] { "ID", "Type", "Personne", "Montant", "Date", "Statut", "Motif" }, 0
-        ) {
+        // 2. TABLEAU
+        String[] cols = { "DATE", "TYPE", "PERSONNE", "MONTANT", "STATUT" };
+        model = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
-
         table = new JTable(model);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        styleTable(table);
 
-        // ===== BOTTOM (totaux + actions) =====
-        JPanel bottom = new JPanel(new BorderLayout());
+        table.getColumnModel().getColumn(4).setCellRenderer(new StatusBadgeRenderer());
 
-        JPanel totals = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        lblTotalEmprunts = new JLabel("Total emprunts en cours: —");
-        lblTotalPrets = new JLabel("Total prêts en cours: —");
-        totals.add(lblTotalEmprunts);
-        totals.add(new JLabel(" | "));
-        totals.add(lblTotalPrets);
+        ShadowPanel tableContainer = new ShadowPanel();
+        tableContainer.setLayout(new BorderLayout());
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getViewport().setBackground(Color.WHITE);
+        tableContainer.add(scroll, BorderLayout.CENTER);
+        add(tableContainer, BorderLayout.CENTER);
 
-        bottom.add(totals, BorderLayout.WEST);
+        // 3. ACTIONS
+        JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+        bottomBar.setOpaque(false);
+        JButton btnRembourser = createButton("Marquer Remboursé", new Color(39, 174, 96));
+        bottomBar.add(btnRembourser);
+        add(bottomBar, BorderLayout.SOUTH);
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnMarkPaid = new JButton("Marquer remboursé");
-        JButton btnDelete = new JButton("Supprimer");
-        JButton btnDetail = new JButton("Détail");
-        actions.add(btnMarkPaid);
-        actions.add(btnDelete);
-        actions.add(btnDetail);
-
-        bottom.add(actions, BorderLayout.EAST);
-
-        add(bottom, BorderLayout.SOUTH);
-
-        // ===== EVENTS =====
-        btnAdd.addActionListener(e -> openCreate());
-        btnDetail.addActionListener(e -> showDetailSelected());
-
-        btnMarkPaid.addActionListener(e -> {
-            Long id = getSelectedId();
-            if (id == null) return;
-
-            int ok = JOptionPane.showConfirmDialog(this,
-                    "Marquer comme REMBOURSÉ ?",
-                    "Confirmation",
-                    JOptionPane.YES_NO_OPTION);
-
-            if (ok == JOptionPane.YES_OPTION) {
-                try {
-                    ctrl.changerStatut(this, id, StatutEmprunt.REMBOURSE.name(), () -> {
-                        UiDialogs.info(this, "Statut mis à jour.");
-                        refresh();
-                    });
-                } catch (Exception ex) {
-                    UiDialogs.handle(this, ex);
-                }
-            }
-        });
-
-        btnDelete.addActionListener(e -> {
-            Long id = getSelectedId();
-            if (id == null) return;
-
-            int ok = JOptionPane.showConfirmDialog(this,
-                    "Supprimer cet emprunt/prêt ?",
-                    "Confirmation",
-                    JOptionPane.YES_NO_OPTION);
-            if (ok != JOptionPane.YES_OPTION) return;
-
-            try {
-                ctrl.supprimer(this, id, () -> {
-                    UiDialogs.info(this, "Supprimé.");
-                    refresh();
-                });
-            } catch (Exception ex) {
-                UiDialogs.handle(this, ex);
-            }
-        });
-
-        btnSearch.addActionListener(e -> refresh());
-        txtSearch.addActionListener(e -> refresh());
-        cbType.addActionListener(e -> refresh());
-        cbStatut.addActionListener(e -> refresh());
-
-        btnRefresh.addActionListener(e -> {
-            txtSearch.setText("");
-            cbType.setSelectedIndex(0);
-            cbStatut.setSelectedIndex(0);
-            refresh();
-        });
-    }
-
-    private void openCreate() {
-        Long reparateurId = session.getReparateurId();
-        if (reparateurId == null) {
-            UiDialogs.warn(this, "Cette page est réservée au réparateur.");
-            return;
-        }
-
-        try {
-            EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this));
-            dlg.setModeCreate();
+        // --- EVENTS ---
+        btnAdd.addActionListener(e -> {
+            Window parent = SwingUtilities.getWindowAncestor(this);
+            // On ouvre le Dialog
+            EmpruntDialog dlg = new EmpruntDialog(parent, session);
             dlg.setVisible(true);
-
-            if (!dlg.isSaved()) return;
-
-            EmpruntDialog.EmpruntFormData data = dlg.getFormData();
-            if (data == null) return;
-
-            TypeEmprunt type = "PRET".equalsIgnoreCase(data.type) ? TypeEmprunt.PRET : TypeEmprunt.EMPRUNT;
-
-            // create() n'accepte pas date/statut => statut = EN_COURS par défaut côté service
-            ctrl.creer(this, reparateurId, type, data.personne, data.montantStr, data.remarque, created -> {
-                UiDialogs.info(this, "Ajout OK.");
-                refresh();
-            });
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
-        }
-    }
-
-    private void refresh() {
-        Long reparateurId = session.getReparateurId();
-        if (reparateurId == null) {
-            UiDialogs.warn(this, "Cette page est réservée au réparateur (session invalide).");
-            return;
-        }
-
-        try {
-            ctrl.lister(this, reparateurId, list -> {
-                List<Object[]> rows = toRowsFiltered(list);
-
-                model.setRowCount(0);
-                for (Object[] r : rows) model.addRow(r);
-
-                updateTotalsFromRows(rows);
-            });
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
-        }
-    }
-
-    private List<Object[]> toRowsFiltered(List<Emprunt> list) {
-        String q = txtSearch.getText() != null ? txtSearch.getText().trim().toLowerCase() : "";
-        Object typeSel = cbType.getSelectedItem();
-        Object statutSel = cbStatut.getSelectedItem();
-
-        TypeEmprunt typeFilter = (typeSel instanceof TypeEmprunt) ? (TypeEmprunt) typeSel : null;
-        StatutEmprunt statutFilter = (statutSel instanceof StatutEmprunt) ? (StatutEmprunt) statutSel : null;
-
-        List<Object[]> out = new ArrayList<>();
-
-        for (Emprunt e : list) {
-            String personne = safe(e.getNomPersonne());
-            String motif = safe(e.getMotif());
-
-            if (!q.isEmpty()) {
-                String hay = (personne + " " + motif).toLowerCase();
-                if (!hay.contains(q)) continue;
+            
+            if(dlg.isSaved()) {
+                 UiDialogs.info(this, "Enregistré (Simulation) !");
+                 model.insertRow(0, new Object[]{"Auj.", dlg.getFormData().type, dlg.getFormData().personne, dlg.getFormData().montantStr + " DH", "NON_REGLE"});
             }
+        });
 
-            if (typeFilter != null && e.getType() != typeFilter) continue;
-            if (statutFilter != null && e.getStatut() != statutFilter) continue;
-
-            String dt = e.getDateEmprunt() != null ? e.getDateEmprunt().format(DT) : "";
-
-            out.add(new Object[] {
-                    e.getId(),
-                    e.getType(),
-                    personne,
-                    e.getMontant(),
-                    dt,
-                    e.getStatut(),
-                    motif
-            });
-        }
-
-        return out;
+        btnRembourser.addActionListener(e -> UiDialogs.info(this, "Action Remboursement (Simulation)"));
     }
 
-    private void updateTotalsFromRows(List<Object[]> rows) {
-        double totalEmprunts = 0;
-        double totalPrets = 0;
+    private void fillMockData() {
+        model.setRowCount(0);
+        model.addRow(new Object[]{ "14/01/2026", "PRET_EMPOYE", "Technicien Ali", "500.00 DH", "NON_REGLE" });
+        model.addRow(new Object[]{ "10/01/2026", "EMPRUNT_EXT", "Fournisseur Info", "2000.00 DH", "REGLE" });
+    }
 
-        for (Object[] r : rows) {
-            String type = r[1] != null ? r[1].toString() : "";
-            String statut = r[5] != null ? r[5].toString() : "";
-
-            // "en cours" = EN_COURS ou PARTIELLEMENT_REMBOURSE
-            if (!("EN_COURS".equalsIgnoreCase(statut) || "PARTIELLEMENT_REMBOURSE".equalsIgnoreCase(statut))) {
-                continue;
+    class StatusBadgeRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+            JLabel l = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            l.setHorizontalAlignment(JLabel.CENTER);
+            String status = (value != null) ? value.toString() : "";
+            
+            if (status.contains("NON")) {
+                l.setForeground(new Color(192, 57, 43));
+                l.setText("✖ NON RÉGLÉ");
+            } else {
+                l.setForeground(new Color(39, 174, 96));
+                l.setText("✔ RÉGLÉ");
             }
-
-            double montant = 0;
-            try {
-                montant = Double.parseDouble(r[3].toString().replace(",", "."));
-            } catch (Exception ignored) {}
-
-            if ("EMPRUNT".equalsIgnoreCase(type)) totalEmprunts += montant;
-            if ("PRET".equalsIgnoreCase(type)) totalPrets += montant;
-        }
-
-        lblTotalEmprunts.setText("Total emprunts en cours: " + formatDh(totalEmprunts));
-        lblTotalPrets.setText("Total prêts en cours: " + formatDh(totalPrets));
-    }
-
-    private void showDetailSelected() {
-        Long id = getSelectedId();
-        if (id == null) return;
-
-        int row = table.getSelectedRow();
-        String type = safe(model.getValueAt(row, 1));
-        String personne = safe(model.getValueAt(row, 2));
-        String montant = safe(model.getValueAt(row, 3));
-        String date = safe(model.getValueAt(row, 4));
-        String statut = safe(model.getValueAt(row, 5));
-        String motif = safe(model.getValueAt(row, 6));
-
-        UiDialogs.info(this,
-                "Emprunt/Prêt #" + id + "\n" +
-                "Type: " + type + "\n" +
-                "Personne: " + personne + "\n" +
-                "Montant: " + montant + "\n" +
-                "Date: " + date + "\n" +
-                "Statut: " + statut + "\n" +
-                "Motif: " + motif);
-    }
-
-    private Long getSelectedId() {
-        int row = table.getSelectedRow();
-        if (row < 0) {
-            UiDialogs.warn(this, "Sélectionne une ligne d'abord.");
-            return null;
-        }
-        Object v = model.getValueAt(row, 0);
-        if (v == null) return null;
-        try {
-            return Long.valueOf(v.toString());
-        } catch (Exception ex) {
-            return null;
+            if(isSelected) l.setForeground(Color.BLACK);
+            return l;
         }
     }
 
-    private String formatDh(double v) {
-        if (v == (long) v) return ((long) v) + " DH";
-        return String.format("%.2f DH", v);
+    private void styleTable(JTable table) {
+        table.setRowHeight(45);
+        table.setShowVerticalLines(false);
+        table.setShowHorizontalLines(true);
+        table.setGridColor(new Color(240, 240, 240));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.setSelectionBackground(new Color(235, 248, 245));
+        table.setSelectionForeground(Color.BLACK);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        ((DefaultTableCellRenderer)table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.CENTER);
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        for(int i=0; i<table.getColumnCount(); i++) {
+            if(i != 4) table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+        }
     }
 
-    private String safe(Object o) {
-        return o == null ? "" : o.toString();
+    private JButton createButton(String text, Color bg) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btn.setBackground(bg);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btn.setBorder(new EmptyBorder(10, 20, 10, 20));
+        return btn;
+    }
+
+    private void styleInput(JTextField txt) {
+        txt.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(220, 220, 220)), 
+            BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+    }
+
+    class ShadowPanel extends JPanel {
+        public ShadowPanel() { setOpaque(false); setBorder(new EmptyBorder(5, 5, 10, 5)); }
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(Color.WHITE);
+            g2.fillRoundRect(5, 5, getWidth()-10, getHeight()-15, 15, 15);
+            g2.setColor(CARD_SHADOW);
+            g2.drawRoundRect(5, 5, getWidth()-10, getHeight()-15, 15, 15);
+            super.paintChildren(g);
+        }
     }
 }

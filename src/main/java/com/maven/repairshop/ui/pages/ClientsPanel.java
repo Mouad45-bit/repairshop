@@ -1,15 +1,29 @@
 package com.maven.repairshop.ui.pages;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
 import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.Window;
 
-import javax.swing.*;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableColumn;
+import javax.swing.table.JTableHeader;
 
-import com.maven.repairshop.model.Client;
-import com.maven.repairshop.ui.controllers.ClientController;
-import com.maven.repairshop.ui.controllers.ControllerRegistry;
 import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.dialogs.ClientDialog;
 import com.maven.repairshop.ui.session.SessionContext;
@@ -18,8 +32,10 @@ public class ClientsPanel extends JPanel {
 
     private final SessionContext session;
 
-    // Controller récupéré depuis le registre (branché sur ServiceRegistry -> backend)
-    private final ClientController ctrl = ControllerRegistry.get().clients();
+    // --- DESIGN CONSTANTS ---
+    private final Color MAIN_COLOR = new Color(44, 185, 152);
+    private final Color BG_APP = new Color(240, 242, 245);
+    private final Color CARD_SHADOW = new Color(200, 200, 200, 80);
 
     private JTable table;
     private DefaultTableModel model;
@@ -28,225 +44,175 @@ public class ClientsPanel extends JPanel {
     public ClientsPanel(SessionContext session) {
         this.session = session;
         initUi();
-        refresh();
+        fillMockData(); 
     }
 
     private void initUi() {
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(25, 25));
+        setBackground(BG_APP);
+        setBorder(new EmptyBorder(25, 25, 25, 25));
 
-        // ===== TOP =====
-        JPanel top = new JPanel(new BorderLayout());
+        // 1. HEADER
+        JPanel headerPanel = new JPanel(new BorderLayout(0, 15));
+        headerPanel.setOpaque(false);
 
-        JPanel search = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        txtSearch = new JTextField(18);
-        JButton btnSearch = new JButton("Rechercher");
-        JButton btnRefresh = new JButton("Actualiser");
+        JLabel lblTitle = new JLabel("Base Clients (Design Test)");
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        lblTitle.setForeground(new Color(40, 40, 40));
+        headerPanel.add(lblTitle, BorderLayout.NORTH);
 
-        search.add(new JLabel("Recherche:"));
-        search.add(txtSearch);
-        search.add(btnSearch);
-        search.add(btnRefresh);
+        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        toolbar.setOpaque(false);
 
-        JPanel actionsTop = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnAdd = new JButton("+ Ajouter");
-        actionsTop.add(btnAdd);
+        txtSearch = new JTextField(20);
+        styleInput(txtSearch);
 
-        top.add(search, BorderLayout.CENTER);
-        top.add(actionsTop, BorderLayout.EAST);
+        JButton btnSearch = createButton("🔍 Rechercher", MAIN_COLOR);
+        JButton btnRefresh = createButton("Actualiser", new Color(149, 165, 166));
+        
+        // --- BOUTON AJOUTER (Remis à sa place !) ---
+        JButton btnAdd = createButton("➕ Nouveau Client", new Color(41, 128, 185)); // Bleu
 
-        add(top, BorderLayout.NORTH);
+        toolbar.add(new JLabel("Recherche:"));
+        toolbar.add(txtSearch);
+        toolbar.add(btnSearch);
+        toolbar.add(btnRefresh);
+        toolbar.add(new JLabel("     ")); // Espace
+        toolbar.add(btnAdd);            // Le bouton est bien là !
 
-        // ===== TABLE =====
-        model = new DefaultTableModel(new Object[] { "ID", "Nom", "Téléphone", "Email", "Adresse", "Ville" }, 0) {
+        headerPanel.add(toolbar, BorderLayout.CENTER);
+        add(headerPanel, BorderLayout.NORTH);
+
+        // 2. TABLEAU
+        model = new DefaultTableModel(new Object[] { "ID", "NOM COMPLET", "TÉLÉPHONE", "EMAIL", "ADRESSE", "VILLE" }, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
         table = new JTable(model);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        styleTable(table);
 
-        // cacher colonne ID
-        TableColumn idCol = table.getColumnModel().getColumn(0);
-        idCol.setMinWidth(0);
-        idCol.setMaxWidth(0);
-        idCol.setPreferredWidth(0);
+        // Cacher ID
+        table.getColumnModel().getColumn(0).setMinWidth(0);
+        table.getColumnModel().getColumn(0).setMaxWidth(0);
+        table.getColumnModel().getColumn(0).setPreferredWidth(0);
 
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        ShadowPanel tableContainer = new ShadowPanel();
+        tableContainer.setLayout(new BorderLayout());
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getViewport().setBackground(Color.WHITE);
+        tableContainer.add(scroll, BorderLayout.CENTER);
+        add(tableContainer, BorderLayout.CENTER);
 
-        // ===== BOTTOM =====
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JButton btnEdit = new JButton("Modifier");
-        JButton btnDelete = new JButton("Supprimer");
-        JButton btnDetail = new JButton("Détail");
-        bottom.add(btnEdit);
-        bottom.add(btnDelete);
-        bottom.add(btnDetail);
-        add(bottom, BorderLayout.SOUTH);
+        // 3. ACTIONS BAS DE PAGE
+        JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+        bottomBar.setOpaque(false);
 
-        // ===== EVENTS =====
-        btnSearch.addActionListener(e -> refresh());
-        txtSearch.addActionListener(e -> refresh());
+        JButton btnDetail = createButton("Voir Fiche", new Color(52, 73, 94));
+        JButton btnEdit = createButton("Modifier", new Color(243, 156, 18));
+        JButton btnDelete = createButton("Supprimer", new Color(231, 76, 60));
 
-        btnRefresh.addActionListener(e -> {
-            txtSearch.setText("");
-            refresh();
-        });
+        bottomBar.add(btnDetail);
+        bottomBar.add(btnEdit);
+        bottomBar.add(btnDelete);
+        add(bottomBar, BorderLayout.SOUTH);
+        
+        // --- EVENTS ---
 
-        btnAdd.addActionListener(e -> createClient());
-        btnEdit.addActionListener(e -> editClient());
-        btnDelete.addActionListener(e -> deleteClient());
-        btnDetail.addActionListener(e -> showDetail());
-    }
-
-    private void refresh() {
-        Long reparateurId = session.getReparateurId();
-        if (reparateurId == null) {
-            UiDialogs.warn(this, "Cette page est réservée au réparateur (session invalide).");
-            return;
-        }
-
-        String q = txtSearch.getText() == null ? "" : txtSearch.getText().trim();
-
-        // Contract backend: rechercher(query, reparateurId)
-        try {
-            ctrl.rechercher(this, q, reparateurId, this::fillTable);
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
-        }
-    }
-
-    private void fillTable(java.util.List<Client> list) {
-        model.setRowCount(0);
-        for (Client c : list) {
-            model.addRow(new Object[] {
-                    c.getId(),
-                    safe(c.getNom()),
-                    safe(c.getTelephone()),
-                    safe(c.getEmail()),
-                    safe(c.getAdresse()),
-                    safe(c.getVille())
-            });
-        }
-    }
-
-    private void createClient() {
-        Long reparateurId = session.getReparateurId();
-        if (reparateurId == null) {
-            UiDialogs.warn(this, "Cette page est réservée au réparateur.");
-            return;
-        }
-
-        try {
-            ClientDialog dlg = new ClientDialog(SwingUtilities.getWindowAncestor(this));
+        btnAdd.addActionListener(e -> {
+            Window parent = SwingUtilities.getWindowAncestor(this);
+            ClientDialog dlg = new ClientDialog(parent);
             dlg.setModeCreate();
             dlg.setVisible(true);
+            
+            if (dlg.isSaved()) {
+                 ClientDialog.ClientFormData data = dlg.getFormData();
+                 model.addRow(new Object[]{ 99L, data.nom, data.telephone, data.email, data.adresse, data.ville });
+                 UiDialogs.info(this, "Client ajouté avec succès !");
+            }
+        });
 
-            if (!dlg.isSaved()) return;
-
-            ClientDialog.ClientFormData data = dlg.getFormData();
-            if (data == null) return;
-
-            ctrl.creer(this,
-                    data.nom, data.telephone, data.email, data.adresse, data.ville,
-                    reparateurId,
-                    created -> {
-                        UiDialogs.info(this, "Client ajouté.");
-                        refresh();
-                    });
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
-        }
-    }
-
-    private void editClient() {
-        Long id = getSelectedId();
-        if (id == null) return;
-
-        int row = table.getSelectedRow();
-        String oldNom = safe(model.getValueAt(row, 1));
-        String oldTel = safe(model.getValueAt(row, 2));
-        String oldEmail = safe(model.getValueAt(row, 3));
-        String oldAdresse = safe(model.getValueAt(row, 4));
-        String oldVille = safe(model.getValueAt(row, 5));
-
-        try {
-            ClientDialog dlg = new ClientDialog(SwingUtilities.getWindowAncestor(this));
-            dlg.setModeEdit(id, oldNom, oldTel, oldEmail, oldAdresse, oldVille);
+        btnEdit.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if(row < 0) { UiDialogs.warn(this, "Sélectionnez un client."); return; }
+            
+            String nom = model.getValueAt(row, 1).toString();
+            String tel = model.getValueAt(row, 2).toString();
+            
+            Window parent = SwingUtilities.getWindowAncestor(this);
+            ClientDialog dlg = new ClientDialog(parent);
+            dlg.setModeEdit(1L, nom, tel, "email@test.com", "Adresse", "Ville");
             dlg.setVisible(true);
+        });
 
-            if (!dlg.isSaved()) return;
-
-            ClientDialog.ClientFormData data = dlg.getFormData();
-            if (data == null) return;
-
-            ctrl.modifier(this, id,
-                    data.nom, data.telephone, data.email, data.adresse, data.ville,
-                    () -> {
-                        UiDialogs.info(this, "Client modifié.");
-                        refresh();
-                    });
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
-        }
+        btnDetail.addActionListener(e -> UiDialogs.info(this, "Détail : Fonctionne avec le nouveau UiDialogs !"));
+        btnDelete.addActionListener(e -> UiDialogs.error(this, "Suppression impossible (Test Design)."));
     }
 
-    private void deleteClient() {
-        Long id = getSelectedId();
-        if (id == null) return;
-
-        int ok = JOptionPane.showConfirmDialog(
-                this,
-                "Supprimer ce client ?\n(Interdit si le client a des réparations, selon règles métier.)",
-                "Confirmation",
-                JOptionPane.YES_NO_OPTION
-        );
-        if (ok != JOptionPane.YES_OPTION) return;
-
-        try {
-            ctrl.supprimer(this, id, () -> {
-                UiDialogs.info(this, "Client supprimé.");
-                refresh();
-            });
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
-        }
+    private void fillMockData() {
+        model.setRowCount(0);
+        model.addRow(new Object[]{ 1L, "Ahmed Benali", "0661123456", "ahmed@gmail.com", "12 Rue des Fleurs", "Casablanca" });
+        model.addRow(new Object[]{ 2L, "Sarah Idrissi", "0662987654", "sarah.id@outlook.fr", "Apt 4, Imm 2", "Rabat" });
+        model.addRow(new Object[]{ 3L, "Karim Tazi", "0655443322", "k.tazi@company.ma", "Zone Ind. 3", "Tanger" });
     }
 
-    private void showDetail() {
-        Long id = getSelectedId();
-        if (id == null) return;
+    private void styleTable(JTable table) {
+        table.setRowHeight(45);
+        table.setShowVerticalLines(false);
+        table.setShowHorizontalLines(true);
+        table.setGridColor(new Color(240, 240, 240));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.setSelectionBackground(new Color(235, 248, 245));
+        table.setSelectionForeground(Color.BLACK);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        int row = table.getSelectedRow();
-        String nom = safe(model.getValueAt(row, 1));
-        String tel = safe(model.getValueAt(row, 2));
-        String email = safe(model.getValueAt(row, 3));
-        String adresse = safe(model.getValueAt(row, 4));
-        String ville = safe(model.getValueAt(row, 5));
-
-        UiDialogs.info(this,
-                "Client #" + id + "\n" +
-                "Nom: " + nom + "\n" +
-                "Téléphone: " + tel + "\n" +
-                "Email: " + email + "\n" +
-                "Adresse: " + adresse + "\n" +
-                "Ville: " + ville + "\n\n" +
-                "(Plus tard: ouvrir un vrai écran détail + historique réparations.)");
+        JTableHeader header = table.getTableHeader();
+        header.setDefaultRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                JLabel l = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                l.setBackground(Color.WHITE);
+                l.setForeground(new Color(150, 150, 150));
+                l.setFont(new Font("Segoe UI", Font.BOLD, 11));
+                l.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(240, 240, 240)));
+                l.setHorizontalAlignment(JLabel.CENTER);
+                return l;
+            }
+        });
+        
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        for(int i=1; i<table.getColumnCount(); i++) table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
     }
 
-    private Long getSelectedId() {
-        int row = table.getSelectedRow();
-        if (row < 0) {
-            UiDialogs.warn(this, "Sélectionne une ligne d'abord.");
-            return null;
-        }
-        Object v = model.getValueAt(row, 0);
-        if (v == null) return null;
-        try {
-            return Long.valueOf(v.toString());
-        } catch (Exception ex) {
-            return null;
-        }
+    private JButton createButton(String text, Color bg) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btn.setBackground(bg);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btn.setBorder(new EmptyBorder(10, 20, 10, 20));
+        return btn;
     }
 
-    private String safe(Object o) {
-        return o == null ? "" : o.toString();
+    private void styleInput(JTextField txt) {
+        txt.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(220, 220, 220)), 
+            BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+    }
+
+    class ShadowPanel extends JPanel {
+        public ShadowPanel() { setOpaque(false); setBorder(new EmptyBorder(5, 5, 10, 5)); }
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(Color.WHITE);
+            g2.fillRoundRect(5, 5, getWidth()-10, getHeight()-15, 15, 15);
+            g2.setColor(CARD_SHADOW);
+            g2.drawRoundRect(5, 5, getWidth()-10, getHeight()-15, 15, 15);
+            super.paintChildren(g);
+        }
     }
 }

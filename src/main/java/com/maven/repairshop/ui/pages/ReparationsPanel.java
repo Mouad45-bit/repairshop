@@ -1,23 +1,31 @@
 package com.maven.repairshop.ui.pages;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
 import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.Window;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
 
-import javax.swing.*;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableColumn;
+import javax.swing.table.JTableHeader;
 
-import com.maven.repairshop.model.Reparation;
-import com.maven.repairshop.model.enums.StatutReparation;
-import com.maven.repairshop.ui.controllers.ControllerRegistry;
-import com.maven.repairshop.ui.controllers.ReparationController;
 import com.maven.repairshop.ui.controllers.UiDialogs;
-import com.maven.repairshop.ui.dialogs.ReparationDetailDialog;
+import com.maven.repairshop.ui.dialogs.ReparationDetailDialog; // <--- Import Important
 import com.maven.repairshop.ui.dialogs.ReparationFormDialog;
 import com.maven.repairshop.ui.session.SessionContext;
 
@@ -25,269 +33,202 @@ public class ReparationsPanel extends JPanel {
 
     private final SessionContext session;
 
-    // controller via registry (UI -> ServiceRegistry -> backend)
-    private final ReparationController controller = ControllerRegistry.get().reparations();
+    // --- DESIGN CONSTANTS ---
+    private final Color MAIN_COLOR = new Color(44, 185, 152);
+    private final Color BG_APP = new Color(240, 242, 245);
+    private final Color CARD_SHADOW = new Color(200, 200, 200, 80);
 
     private JTable table;
-    private DefaultTableModel tableModel;
-
-    private JTextField txtRecherche;
-    private JComboBox<Object> cbStatut;
-
-    private JButton btnAjouter;
-    private JButton btnRechercher;
-    private JButton btnActualiser;
-
-    private JButton btnDetail;
-    private JButton btnChangerStatut;
-    private JButton btnAnnuler;
-
-    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private DefaultTableModel model;
+    private JTextField txtSearch;
 
     public ReparationsPanel(SessionContext session) {
         this.session = session;
-        setLayout(new BorderLayout());
-
-        initTopBar();
-        initTable();
-        initActionsBar();
-
-        refresh(); // charge initial
+        initUi();
+        fillMockData(); // Données de test
     }
 
-    // ---------------- UI ----------------
+    private void initUi() {
+        setLayout(new BorderLayout(25, 25));
+        setBackground(BG_APP);
+        setBorder(new EmptyBorder(25, 25, 25, 25));
 
-    private void initTopBar() {
-        JPanel panelTop = new JPanel(new BorderLayout());
+        // 1. HEADER
+        JPanel headerPanel = new JPanel(new BorderLayout(0, 15));
+        headerPanel.setOpaque(false);
 
-        // gauche : recherche + filtre
-        JPanel panelSearch = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        txtRecherche = new JTextField(16);
+        JLabel lblTitle = new JLabel("Gestion des Réparations (Design)");
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 26));
+        lblTitle.setForeground(new Color(40, 40, 40));
+        headerPanel.add(lblTitle, BorderLayout.NORTH);
 
-        cbStatut = new JComboBox<>();
-        cbStatut.addItem("Tous");
-        for (StatutReparation s : StatutReparation.values()) {
-            cbStatut.addItem(s);
-        }
+        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
+        toolbar.setOpaque(false);
 
-        btnRechercher = new JButton("Rechercher");
-        btnActualiser = new JButton("Actualiser");
+        txtSearch = new JTextField(20);
+        styleInput(txtSearch);
 
-        panelSearch.add(new JLabel("Recherche:"));
-        panelSearch.add(txtRecherche);
-        panelSearch.add(new JLabel("Statut:"));
-        panelSearch.add(cbStatut);
-        panelSearch.add(btnRechercher);
-        panelSearch.add(btnActualiser);
+        JButton btnSearch = createButton("🔍 Rechercher", MAIN_COLOR);
+        JButton btnRefresh = createButton("Actualiser", new Color(149, 165, 166));
+        JButton btnAdd = createButton("➕ Nouvelle Réparation", new Color(230, 126, 34)); // Orange
 
-        // droite : Ajouter
-        JPanel panelRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        btnAjouter = new JButton("+ Ajouter");
-        panelRight.add(btnAjouter);
+        toolbar.add(new JLabel("Recherche:"));
+        toolbar.add(txtSearch);
+        toolbar.add(btnSearch);
+        toolbar.add(btnRefresh);
+        toolbar.add(new JLabel("     "));
+        toolbar.add(btnAdd);
 
-        // events
-        btnRechercher.addActionListener(e -> refresh());
-        btnActualiser.addActionListener(e -> {
-            txtRecherche.setText("");
-            cbStatut.setSelectedIndex(0);
-            refresh();
-        });
-        cbStatut.addActionListener(e -> refresh());
+        headerPanel.add(toolbar, BorderLayout.CENTER);
+        add(headerPanel, BorderLayout.NORTH);
 
-        txtRecherche.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) refresh();
-            }
-        });
-
-        btnAjouter.addActionListener(e -> onAjouter());
-
-        panelTop.add(panelSearch, BorderLayout.CENTER);
-        panelTop.add(panelRight, BorderLayout.EAST);
-
-        add(panelTop, BorderLayout.NORTH);
-    }
-
-    private void initTable() {
-        tableModel = new DefaultTableModel(
-                new Object[]{"ID", "Code", "Client", "Statut", "Dernier statut"},
-                0
-        ) {
-            @Override public boolean isCellEditable(int row, int col) { return false; }
+        // 2. TABLEAU
+        String[] cols = { "TICKET", "CLIENT", "APPAREIL", "PANNE", "STATUT", "DATE" };
+        model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
         };
+        table = new JTable(model);
+        styleTable(table);
 
-        table = new JTable(tableModel);
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        // Custom Renderer pour le Statut (Colonne 4)
+        table.getColumnModel().getColumn(4).setCellRenderer(new StatusBadgeRenderer());
 
-        TableColumn idCol = table.getColumnModel().getColumn(0);
-        idCol.setMinWidth(0);
-        idCol.setMaxWidth(0);
-        idCol.setPreferredWidth(0);
+        ShadowPanel tableContainer = new ShadowPanel();
+        tableContainer.setLayout(new BorderLayout());
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getViewport().setBackground(Color.WHITE);
+        tableContainer.add(scroll, BorderLayout.CENTER);
+        add(tableContainer, BorderLayout.CENTER);
 
-        add(new JScrollPane(table), BorderLayout.CENTER);
-    }
+        // 3. ACTIONS
+        JPanel bottomBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+        bottomBar.setOpaque(false);
+        
+        JButton btnDetail = createButton("Voir Détail", new Color(52, 73, 94));
+        JButton btnEtat = createButton("Changer Statut", new Color(41, 128, 185));
 
-    private void initActionsBar() {
-        JPanel panelActions = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        bottomBar.add(btnDetail);
+        bottomBar.add(btnEtat);
+        add(bottomBar, BorderLayout.SOUTH);
 
-        btnDetail = new JButton("Détail");
-        btnChangerStatut = new JButton("Changer statut");
-        btnAnnuler = new JButton("Annuler");
-
-        btnDetail.addActionListener(e -> onDetail());
-        btnChangerStatut.addActionListener(e -> onChangerStatut());
-        btnAnnuler.addActionListener(e -> onAnnuler());
-
-        panelActions.add(btnDetail);
-        panelActions.add(btnChangerStatut);
-        panelActions.add(btnAnnuler);
-
-        add(panelActions, BorderLayout.SOUTH);
-    }
-
-    // ---------------- Logic UI ----------------
-
-    private void refresh() {
-        Long reparateurId = session.getReparateurId();
-        if (reparateurId == null) {
-            UiDialogs.warn(this, "Session invalide (réparateur introuvable).");
-            return;
-        }
-
-        String query = txtRecherche.getText();
-        StatutReparation statut = selectedStatutOrNull();
-
-        try {
-            controller.rechercher(this, query, reparateurId, statut, this::fillTable);
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
-        }
-    }
-
-    private void fillTable(List<Reparation> list) {
-        tableModel.setRowCount(0);
-
-        for (Reparation r : list) {
-            Long id = r.getId();
-            String code = r.getCodeUnique();
-            String client = (r.getClient() != null) ? safe(r.getClient().getNom()) : "";
-            StatutReparation st = r.getStatut();
-            String last = (r.getDateDernierStatut() != null) ? r.getDateDernierStatut().format(DT_FMT) : "";
-
-            tableModel.addRow(new Object[]{ id, code, client, st, last });
-        }
-    }
-
-    private void onAjouter() {
-        try {
-            Window w = SwingUtilities.getWindowAncestor(this);
-            ReparationFormDialog dlg = new ReparationFormDialog(w, session);
+        // --- EVENTS ---
+        
+        // Clic sur NOUVELLE RÉPARATION
+        btnAdd.addActionListener(e -> {
+            Window parent = SwingUtilities.getWindowAncestor(this);
+            ReparationFormDialog dlg = new ReparationFormDialog(parent, session);
             dlg.setVisible(true);
 
-            if (!dlg.isSaved()) return;
-
-            // Refresh liste
-            refresh();
-
-            // Option UX : ouvrir directement le détail de la nouvelle réparation
-            Reparation created = dlg.getCreated();
-            if (created != null && created.getId() != null) {
-                new ReparationDetailDialog(w, session, created.getId()).setVisible(true);
+            if (dlg.isSaved()) {
+                UiDialogs.info(this, "Ticket créé (Simulation Design) !");
+                model.insertRow(0, new Object[]{"NEW-001", "Nouveau Client", "iPhone Test", "Écran", "EN_ATTENTE", "A l'instant"});
             }
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
+        });
+
+        // Clic sur VOIR DÉTAIL (Connecté !)
+        btnDetail.addActionListener(e -> {
+            Window parent = SwingUtilities.getWindowAncestor(this);
+            // On ouvre la fiche technique (ID 1L par défaut pour le test)
+            ReparationDetailDialog dlg = new ReparationDetailDialog(parent, session, 1L);
+            dlg.setVisible(true);
+        });
+        
+        btnEtat.addActionListener(e -> UiDialogs.info(this, "Utilisez 'Voir Détail' pour modifier le statut."));
+    }
+
+    private void fillMockData() {
+        model.setRowCount(0);
+        model.addRow(new Object[]{ "REP-2401", "Ahmed Benali", "Samsung S21", "Écran cassé", "EN_COURS", "12/01/2026" });
+        model.addRow(new Object[]{ "REP-2402", "Sarah Idrissi", "MacBook Pro", "Batterie HS", "TERMINE", "10/01/2026" });
+        model.addRow(new Object[]{ "REP-2403", "Karim Tazi", "HP Pavilion", "Chauffe", "EN_ATTENTE", "13/01/2026" });
+    }
+
+    // --- HELPERS DESIGN ---
+
+    class StatusBadgeRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+            JLabel l = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            l.setHorizontalAlignment(JLabel.CENTER);
+            String status = (value != null) ? value.toString() : "";
+            
+            // Couleurs des badges
+            if (status.contains("TERMINE")) {
+                l.setForeground(new Color(39, 174, 96));
+                l.setText("✔ TERMINÉ");
+            } else if (status.contains("COURS")) {
+                l.setForeground(new Color(230, 126, 34));
+                l.setText("⚡ EN COURS");
+            } else {
+                l.setForeground(Color.GRAY);
+                l.setText("⏳ " + status);
+            }
+            if(isSelected) l.setForeground(Color.BLACK);
+            return l;
         }
     }
 
-    private void onDetail() {
-        Long id = selectedId();
-        if (id == null) {
-            UiDialogs.warn(this, "Sélectionne une réparation d'abord.");
-            return;
-        }
+    private void styleTable(JTable table) {
+        table.setRowHeight(45);
+        table.setShowVerticalLines(false);
+        table.setShowHorizontalLines(true);
+        table.setGridColor(new Color(240, 240, 240));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.setSelectionBackground(new Color(235, 248, 245));
+        table.setSelectionForeground(Color.BLACK);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        try {
-            Window w = SwingUtilities.getWindowAncestor(this);
-            new ReparationDetailDialog(w, session, id).setVisible(true);
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
-        }
-    }
-
-    private void onChangerStatut() {
-        Long id = selectedId();
-        if (id == null) {
-            UiDialogs.warn(this, "Sélectionne une réparation d'abord.");
-            return;
-        }
-
-        Object stObj = table.getValueAt(table.getSelectedRow(), 3);
-        StatutReparation current = (stObj instanceof StatutReparation) ? (StatutReparation) stObj : null;
-
-        JComboBox<StatutReparation> cb = new JComboBox<>(StatutReparation.values());
-        if (current != null) cb.setSelectedItem(current);
-
-        int ok = JOptionPane.showConfirmDialog(
-                this,
-                cb,
-                "Nouveau statut",
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.QUESTION_MESSAGE
-        );
-        if (ok != JOptionPane.OK_OPTION) return;
-
-        StatutReparation nouveau = (StatutReparation) cb.getSelectedItem();
-        if (nouveau == null) return;
-
-        try {
-            controller.changerStatut(this, id, nouveau, this::refresh);
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
+        JTableHeader header = table.getTableHeader();
+        header.setDefaultRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                JLabel l = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                l.setBackground(Color.WHITE);
+                l.setForeground(new Color(150, 150, 150));
+                l.setFont(new Font("Segoe UI", Font.BOLD, 11));
+                l.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(240, 240, 240)));
+                l.setHorizontalAlignment(JLabel.CENTER);
+                return l;
+            }
+        });
+        
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        for(int i=0; i<table.getColumnCount(); i++) {
+            if(i != 4) table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer); // Sauf statut
         }
     }
 
-    private void onAnnuler() {
-        Long id = selectedId();
-        if (id == null) {
-            UiDialogs.warn(this, "Sélectionne une réparation d'abord.");
-            return;
+    private JButton createButton(String text, Color bg) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btn.setBackground(bg);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btn.setBorder(new EmptyBorder(10, 20, 10, 20));
+        return btn;
+    }
+
+    private void styleInput(JTextField txt) {
+        txt.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(220, 220, 220)), 
+            BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+    }
+
+    class ShadowPanel extends JPanel {
+        public ShadowPanel() { setOpaque(false); setBorder(new EmptyBorder(5, 5, 10, 5)); }
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(Color.WHITE);
+            g2.fillRoundRect(5, 5, getWidth()-10, getHeight()-15, 15, 15);
+            g2.setColor(CARD_SHADOW);
+            g2.drawRoundRect(5, 5, getWidth()-10, getHeight()-15, 15, 15);
+            super.paintChildren(g);
         }
-
-        int ok = JOptionPane.showConfirmDialog(
-                this,
-                "Confirmer l'annulation ?",
-                "Annuler réparation",
-                JOptionPane.YES_NO_OPTION
-        );
-        if (ok != JOptionPane.YES_OPTION) return;
-
-        try {
-            controller.changerStatut(this, id, StatutReparation.ANNULEE, this::refresh);
-        } catch (Exception ex) {
-            UiDialogs.handle(this, ex);
-        }
-    }
-
-    // ---------------- Helpers ----------------
-
-    private Long selectedId() {
-        int row = table.getSelectedRow();
-        if (row < 0) return null;
-
-        Object v = table.getValueAt(row, 0);
-        if (v instanceof Long) return (Long) v;
-        if (v instanceof Number) return ((Number) v).longValue();
-        return null;
-    }
-
-    private StatutReparation selectedStatutOrNull() {
-        Object s = cbStatut.getSelectedItem();
-        if (s instanceof StatutReparation) return (StatutReparation) s;
-        return null;
-    }
-
-    private static String safe(String s) {
-        return s == null ? "" : s;
     }
 }
