@@ -15,6 +15,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 
+import com.maven.repairshop.ui.controllers.UiDialogs;
 import com.maven.repairshop.ui.session.SessionContext;
 import com.maven.repairshop.ui.util.ServiceRegistry;
 
@@ -187,9 +188,9 @@ public class MainFrame extends JFrame {
         // Réparations
         btnReparations.addActionListener(e -> {
             if (!repOk) {
-                JOptionPane.showMessageDialog(this,
-                        "Module Réparations indisponible.\nMerge le backend correspondant puis relance.",
-                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                UiDialogs.info(this,
+                        "Module Réparations indisponible.\n" +
+                        "Merge le backend correspondant puis relance.");
                 return;
             }
             showReparations();
@@ -198,9 +199,9 @@ public class MainFrame extends JFrame {
         // Clients
         btnClients.addActionListener(e -> {
             if (!cliOk) {
-                JOptionPane.showMessageDialog(this,
-                        "Module Clients indisponible.\nMerge le backend correspondant puis relance.",
-                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                UiDialogs.info(this,
+                        "Module Clients indisponible.\n" +
+                        "Merge le backend correspondant puis relance.");
                 return;
             }
             showClients();
@@ -209,9 +210,9 @@ public class MainFrame extends JFrame {
         // Emprunts
         btnEmprunts.addActionListener(e -> {
             if (!empOk) {
-                JOptionPane.showMessageDialog(this,
-                        "Module Emprunts / Prêts indisponible.\nMerge le backend correspondant puis relance.",
-                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                UiDialogs.info(this,
+                        "Module Emprunts / Prêts indisponible.\n" +
+                        "Merge le backend correspondant puis relance.");
                 return;
             }
             showEmprunts();
@@ -220,9 +221,9 @@ public class MainFrame extends JFrame {
         // Suivi
         btnSuivi.addActionListener(e -> {
             if (!repOk) {
-                JOptionPane.showMessageDialog(this,
-                        "Module Suivi indisponible.\nMerge le backend Réparations puis relance.",
-                        "Info", JOptionPane.INFORMATION_MESSAGE);
+                UiDialogs.info(this,
+                        "Module Suivi indisponible.\n" +
+                        "Merge le backend Réparations puis relance.");
                 return;
             }
             openSuiviDialog();
