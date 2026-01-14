@@ -24,15 +24,15 @@ public class Reparation extends BaseEntity {
     @Column(nullable=false)
     private LocalDateTime dateDernierStatut = LocalDateTime.now();
 
+    @Column(columnDefinition="TEXT")
+    private String commentaireTechnique;
+
     @ManyToOne
     @JoinColumn(name="client_id", nullable=false)
     private Client client;
 
     @OneToMany(mappedBy="reparation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Paiement> paiements = new ArrayList<>();
-
-    @OneToMany(mappedBy="reparation", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Cause> causes = new ArrayList<>();
 
     @OneToMany(mappedBy="reparation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Appareil> appareils = new ArrayList<>();
@@ -48,15 +48,18 @@ public class Reparation extends BaseEntity {
     public LocalDateTime getDateDernierStatut() { return dateDernierStatut; }
     public void setDateDernierStatut(LocalDateTime dateDernierStatut) { this.dateDernierStatut = dateDernierStatut; }
 
+    public String getCommentaireTechnique() { return commentaireTechnique; }
+    public void setCommentaireTechnique(String commentaireTechnique) {
+        this.commentaireTechnique = commentaireTechnique;
+    }
+
     public Client getClient() { return client; }
     public void setClient(Client client) { this.client = client; }
 
     public List<Paiement> getPaiements() { return paiements; }
-    public List<Cause> getCauses() { return causes; }
     public List<Appareil> getAppareils() { return appareils; }
 
     // helpers (très important pour éviter les bugs)
     public void addPaiement(Paiement p) { paiements.add(p); p.setReparation(this); }
-    public void addCause(Cause c) { causes.add(c); c.setReparation(this); }
     public void addAppareil(Appareil a) { appareils.add(a); a.setReparation(this); }
 }
