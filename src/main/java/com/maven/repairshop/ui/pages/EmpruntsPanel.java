@@ -182,7 +182,8 @@ public class EmpruntsPanel extends JPanel {
         }
 
         try {
-            EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this));
+            // EmpruntDialog requiert (Window, SessionContext)
+            EmpruntDialog dlg = new EmpruntDialog(SwingUtilities.getWindowAncestor(this), session);
             dlg.setModeCreate();
             dlg.setVisible(true);
 
@@ -302,12 +303,12 @@ public class EmpruntsPanel extends JPanel {
 
         UiDialogs.info(this,
                 "Emprunt/Prêt #" + id + "\n" +
-                "Type: " + type + "\n" +
-                "Personne: " + personne + "\n" +
-                "Montant: " + montant + "\n" +
-                "Date: " + date + "\n" +
-                "Statut: " + statut + "\n" +
-                "Motif: " + motif);
+                        "Type: " + type + "\n" +
+                        "Personne: " + personne + "\n" +
+                        "Montant: " + montant + "\n" +
+                        "Date: " + date + "\n" +
+                        "Statut: " + statut + "\n" +
+                        "Motif: " + motif);
     }
 
     private Long getSelectedId() {
