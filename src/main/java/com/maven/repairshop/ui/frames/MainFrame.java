@@ -1,7 +1,6 @@
 package com.maven.repairshop.ui.frames;
 
 import com.maven.repairshop.ui.pages.DashboardPanel;
-import com.maven.repairshop.ui.pages.NotImplementedPanel;
 import com.maven.repairshop.ui.session.SessionContext;
 import com.maven.repairshop.ui.util.UiDialogs;
 
@@ -83,7 +82,7 @@ public class MainFrame extends JFrame {
         if (session.isProprietaire()) {
             register("boutique", new com.maven.repairshop.ui.pages.BoutiquePanel(session));
             register("reparateurs", new com.maven.repairshop.ui.pages.ReparateursPanel(session));
-            register("all_caisses", new NotImplementedPanel("Toutes les caisses"));
+            register("all_caisses", new com.maven.repairshop.ui.pages.AllCaissesPanel(session));
             register("allReparations", new com.maven.repairshop.ui.pages.AllReparationsPanel(session));
             register("stats", new com.maven.repairshop.ui.pages.StatsPanel(session));
         }
