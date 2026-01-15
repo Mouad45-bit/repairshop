@@ -79,8 +79,6 @@ public class ReparationDetailDialog extends JDialog {
         tabs.addTab("Appareils", buildAppareilsTab());
         tabs.addTab("Causes", buildCausesTab());
         tabs.addTab("Paiements", buildPaiementsTab());
-        tabs.addTab("Objets", buildNotReadyTab("Objets",
-                "Pas encore disponible dans cette base backend (module à venir)."));
 
         JPanel center = new JPanel(new BorderLayout(12, 12));
         center.add(top, BorderLayout.NORTH);
@@ -212,20 +210,6 @@ public class ReparationDetailDialog extends JDialog {
         return p;
     }
 
-    private JComponent buildNotReadyTab(String title, String message) {
-        JPanel p = new JPanel(new BorderLayout());
-        p.setBorder(new EmptyBorder(20, 20, 20, 20));
-        JLabel t = new JLabel(title);
-        t.setFont(t.getFont().deriveFont(Font.BOLD, 18f));
-
-        JLabel m = new JLabel("<html><div style='width:520px'>" + message + "</div></html>");
-        m.setForeground(new Color(90, 90, 90));
-
-        p.add(t, BorderLayout.NORTH);
-        p.add(m, BorderLayout.CENTER);
-        return p;
-    }
-
     private JComponent buildBottomActions() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         JButton btnClose = new JButton("Fermer");
@@ -236,7 +220,11 @@ public class ReparationDetailDialog extends JDialog {
 
     private void reload() {
         try {
-            this.reparation = reparationCtrl.trouverParId(reparationId);
+            Long userId = session.getCurrentUser().getId();
+
+            //
+            this.reparation = reparationCtrl.trouverParId(reparationId, userId);
+
             if (this.reparation == null) {
                 UiDialogs.error(this, "Réparation introuvable.");
                 dispose();
@@ -325,7 +313,12 @@ public class ReparationDetailDialog extends JDialog {
                 UiDialogs.error(this, "Statut invalide.");
                 return;
             }
-            reparationCtrl.changerStatut(reparationId, s);
+
+            Long userId = session.getCurrentUser().getId();
+
+            //
+            reparationCtrl.changerStatut(reparationId, s, userId);
+
             UiDialogs.success(this, "Statut mis à jour.");
             reload();
 

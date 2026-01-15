@@ -121,7 +121,8 @@ public class ReparationsPanel extends JPanel {
             Object sel = cbStatut.getSelectedItem();
             if (sel instanceof StatutReparation s) statut = s;
 
-            List<Reparation> list = reparationCtrl.rechercher(q, reparateurId, statut);
+            //
+            List<Reparation> list = reparationCtrl.rechercher(q, reparateurId, statut, userId);
 
             for (Reparation r : list) {
                 String client = (r.getClient() != null) ? r.getClient().getNom() : "-";
@@ -173,7 +174,6 @@ public class ReparationsPanel extends JPanel {
                 new ReparationDetailDialog(SwingUtilities.getWindowAncestor(this), session, id);
         dlg.setVisible(true);
 
-        // après fermeture du détail
         refresh();
     }
 }

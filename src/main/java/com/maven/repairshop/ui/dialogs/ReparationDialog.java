@@ -182,7 +182,6 @@ public class ReparationDialog extends JDialog {
 
     private void loadClients() {
         try {
-            // Dans la base "stab", ClientService.rechercher(...) est: rechercher(query, reparateurId, userId)
             Long userId = session.getCurrentUser().getId();
             Long reparateurId = (session.getCurrentUser() instanceof Reparateur) ? userId : null;
 
@@ -207,7 +206,6 @@ public class ReparationDialog extends JDialog {
             return;
         }
 
-        // simple anti-duplicate côté UI
         for (int i = 0; i < appareilsModel.getRowCount(); i++) {
             if (imei.equalsIgnoreCase(String.valueOf(appareilsModel.getValueAt(i, 0)))) {
                 UiDialogs.error(this, "Cet IMEI est déjà ajouté.");
@@ -236,20 +234,16 @@ public class ReparationDialog extends JDialog {
                 return;
             }
 
-            // UI : on garde appareils/avance/commentaire pour plus tard (quand le backend expose ces champs)
-            // Pour l’instant, le backend "stab" crée la réparation avec (clientId, reparateurId) uniquement.
-
-            // Validation UI minimale : on te laisse garder la règle "au moins 1 appareil"
             if (appareilsModel.getRowCount() == 0) {
                 UiDialogs.error(this, "Ajoutez au moins un appareil.");
                 return;
             }
 
-            // On continue de valider l’avance côté UI (mais elle ne part pas au backend pour l’instant)
+            Double avance = null;
             String avanceTxt = txtAvance.getText().trim();
             if (!avanceTxt.isEmpty()) {
                 try {
-                    double avance = Double.parseDouble(avanceTxt);
+                    avance = Double.parseDouble(avanceTxt);
                     if (avance < 0) throw new NumberFormatException();
                 } catch (NumberFormatException nfe) {
                     UiDialogs.error(this, "Avance invalide (nombre >= 0).");
@@ -257,7 +251,6 @@ public class ReparationDialog extends JDialog {
                 }
             }
 
-            // On construit la liste d'appareils (UI-only pour l’instant)
             List<Appareil> appareils = new ArrayList<>();
             for (int i = 0; i < appareilsModel.getRowCount(); i++) {
                 Appareil a = new Appareil();
@@ -266,6 +259,9 @@ public class ReparationDialog extends JDialog {
                 a.setDescription(String.valueOf(appareilsModel.getValueAt(i, 2)));
                 appareils.add(a);
             }
+
+            String commentaire = txtCommentaireClient.getText().trim();
+            if (commentaire.isEmpty()) commentaire = null;
 
             Long userId = session.getCurrentUser().getId();
             Long reparateurId = (session.getCurrentUser() instanceof Reparateur)
@@ -277,13 +273,18 @@ public class ReparationDialog extends JDialog {
                 return;
             }
 
-            created = reparationCtrl.creerReparation(client.getId(), reparateurId);
+            //
+            created = reparationCtrl.creerReparation(
+                    client.getId(),
+                    reparateurId,
+                    appareils,
+                    commentaire,
+                    avance,
+                    userId
+            );
 
             saved = true;
-            UiDialogs.success(this,
-                    "Réparation créée : " + created.getCodeUnique() +
-                            "\n\nNote: appareils/avance/commentaire seront gérés dans les prochaines étapes (services backend)."
-            );
+            UiDialogs.success(this, "Réparation créée : " + created.getCodeUnique());
             dispose();
 
         } catch (BusinessException ex) {
