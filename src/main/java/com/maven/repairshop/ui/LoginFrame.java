@@ -36,8 +36,12 @@ public class LoginFrame extends JFrame {
     private JTextField txtLogin;
     private JPasswordField txtPassword;
 
-    // Bypass pour le développement (pour se connecter sans base de données)
-    private static final boolean DEV_AUTH_BYPASS = true;
+    /**
+     * Bypass pour le développement :
+     * Activer seulement si la variable d'environnement REPAIRSHOP_DEV_BYPASS=true
+     */
+    private static final boolean DEV_AUTH_BYPASS =
+            "true".equalsIgnoreCase(System.getenv("REPAIRSHOP_DEV_BYPASS"));
 
     // --- POINT D'ENTRÉE ---
     public static void main(String[] args) {
@@ -60,7 +64,7 @@ public class LoginFrame extends JFrame {
 
         // Conteneur principal : Grille de 2 colonnes (Gauche / Droite)
         mainPanel = new JPanel();
-        mainPanel.setLayout(new GridLayout(1, 2)); 
+        mainPanel.setLayout(new GridLayout(1, 2));
         setContentPane(mainPanel);
 
         // --- PARTIE GAUCHE (Formulaire Blanc) ---
@@ -120,14 +124,13 @@ public class LoginFrame extends JFrame {
         btnLogin.setFocusPainted(false);
         btnLogin.setBorderPainted(false);
         btnLogin.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        
+
         // Effet de survol
         btnLogin.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) { btnLogin.setBackground(MAIN_COLOR.darker()); }
             public void mouseExited(MouseEvent e) { btnLogin.setBackground(MAIN_COLOR); }
         });
         leftPanel.add(btnLogin);
-
 
         // --- PARTIE DROITE (Fond Vert) ---
         JPanel rightPanel = new JPanel();
@@ -179,16 +182,20 @@ public class LoginFrame extends JFrame {
 
         try {
             if (DEV_AUTH_BYPASS) {
-                // Simulation simple des rôles
-                SessionContext.Role role = login.toLowerCase().contains("admin") 
-                        ? SessionContext.Role.PROPRIETAIRE 
+                // DEV uniquement : rôle simulé pour accélérer les tests UI
+                SessionContext.Role role = login.toLowerCase().contains("admin")
+                        ? SessionContext.Role.PROPRIETAIRE
                         : SessionContext.Role.REPARATEUR;
 
                 SessionContext session = SessionContext.dev(role, login);
                 openMain(session);
                 return;
             }
-            // Ici viendra la vraie connexion plus tard
+
+            // TODO: Brancher ici la vraie authentification (backend)
+            UiDialogs.warn(this,
+                    "Authentification non configurée.\n" +
+                            "Pour le mode dev, définis REPAIRSHOP_DEV_BYPASS=true dans l'environnement.");
         } catch (Exception ex) {
             UiDialogs.handle(this, ex);
         }

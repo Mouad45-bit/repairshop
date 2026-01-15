@@ -108,7 +108,7 @@ public class ClientPickerDialog extends JDialog {
         // Barre de recherche
         JPanel searchBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         searchBar.setBackground(BG_COLOR);
-        
+
         txtRecherche = new JTextField(25);
         styleInput(txtRecherche);
 
@@ -136,7 +136,7 @@ public class ClientPickerDialog extends JDialog {
         JScrollPane scroll = new JScrollPane(table);
         scroll.getViewport().setBackground(Color.WHITE);
         scroll.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
-        
+
         body.add(scroll, BorderLayout.CENTER);
         add(body, BorderLayout.CENTER);
 
@@ -156,14 +156,14 @@ public class ClientPickerDialog extends JDialog {
         // --- EVENTS ---
         btnRechercher.addActionListener(e -> refresh());
         btnActualiser.addActionListener(e -> { txtRecherche.setText(""); refresh(); });
-        
+
         txtRecherche.addKeyListener(new KeyAdapter() {
             @Override public void keyPressed(KeyEvent e) { if (e.getKeyCode() == KeyEvent.VK_ENTER) refresh(); }
         });
 
         btnAnnuler.addActionListener(e -> dispose());
         btnChoisir.addActionListener(e -> onChoisir());
-        
+
         table.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) { if (e.getClickCount() == 2) onChoisir(); }
         });
@@ -174,12 +174,15 @@ public class ClientPickerDialog extends JDialog {
     private void refresh() {
         Long repId = session.getReparateurId();
         if (repId == null) return;
+
         String q = txtRecherche.getText() == null ? "" : txtRecherche.getText().trim();
 
         try {
             controller.rechercher(this, q, repId, this::fillTable);
         } catch (Exception ex) {
-            fillMockData(); 
+            // IMPORTANT: ne pas masquer l'erreur avec du mock
+            UiDialogs.handle(this, ex);
+            tableModel.setRowCount(0); // optionnel: vider la table
         }
     }
 
@@ -187,15 +190,9 @@ public class ClientPickerDialog extends JDialog {
         tableModel.setRowCount(0);
         for (Client c : list) {
             tableModel.addRow(new Object[]{
-                c.getId(), safe(c.getNom()), safe(c.getTelephone()), safe(c.getEmail()), safe(c.getVille())
+                    c.getId(), safe(c.getNom()), safe(c.getTelephone()), safe(c.getEmail()), safe(c.getVille())
             });
         }
-    }
-    
-    private void fillMockData() {
-        tableModel.setRowCount(0);
-        tableModel.addRow(new Object[]{1L, "Ahmed Benali", "0661123456", "ahmed@test.com", "Casablanca"});
-        tableModel.addRow(new Object[]{2L, "Sarah Idrissi", "0662987654", "sarah@test.com", "Rabat"});
     }
 
     private void onChoisir() {
@@ -207,7 +204,7 @@ public class ClientPickerDialog extends JDialog {
 
         Client c = new Client();
         try {
-            // CORRECTION : On ne touche pas à l'ID de l'objet, on le stocke juste dans pickedId
+            // On construit un objet "léger" pour affichage, et on stocke l'ID dans pickedId
             c.setNom((String) table.getValueAt(row, 1));
             c.setTelephone((String) table.getValueAt(row, 2));
             c.setEmail((String) table.getValueAt(row, 3));
@@ -215,7 +212,7 @@ public class ClientPickerDialog extends JDialog {
         } catch (Exception ignored) {}
 
         this.picked = c;
-        this.pickedId = id; // L'ID est stocké ici
+        this.pickedId = id;
         this.selected = true;
         dispose();
     }
@@ -238,7 +235,7 @@ public class ClientPickerDialog extends JDialog {
         t.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         t.setSelectionBackground(new Color(235, 248, 245));
         t.setSelectionForeground(Color.BLACK);
-        
+
         JTableHeader header = t.getTableHeader();
         header.setDefaultRenderer(new DefaultTableCellRenderer() {
             @Override
@@ -272,8 +269,8 @@ public class ClientPickerDialog extends JDialog {
     private void styleInput(JTextField txt) {
         txt.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         txt.setBorder(new CompoundBorder(
-            new LineBorder(new Color(200, 200, 200)), 
-            new EmptyBorder(5, 8, 5, 8)
+                new LineBorder(new Color(200, 200, 200)),
+                new EmptyBorder(5, 8, 5, 8)
         ));
     }
 
