@@ -1,15 +1,26 @@
 package com.maven.repairshop.ui.pages;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.Window;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import javax.swing.table.TableColumn;
 
 import com.maven.repairshop.model.Reparation;
@@ -27,6 +38,12 @@ public class ReparationsPanel extends JPanel {
 
     // controller via registry (UI -> ServiceRegistry -> backend)
     private final ReparationController controller = ControllerRegistry.get().reparations();
+
+    // --- Design V2 ---
+    private final Color MAIN_COLOR = new Color(44, 185, 152);
+    private final Color BG_WHITE = Color.WHITE;
+    private final Color GRAY_TEXT = new Color(150, 150, 150);
+    private final Color BORDER_LIGHT = new Color(230, 230, 230);
 
     private JTable table;
     private DefaultTableModel tableModel;
@@ -47,6 +64,7 @@ public class ReparationsPanel extends JPanel {
     public ReparationsPanel(SessionContext session) {
         this.session = session;
         setLayout(new BorderLayout());
+        setBackground(BG_WHITE);
 
         initTopBar();
         initTable();
@@ -59,33 +77,49 @@ public class ReparationsPanel extends JPanel {
 
     private void initTopBar() {
         JPanel panelTop = new JPanel(new BorderLayout());
+        panelTop.setBackground(BG_WHITE);
+        panelTop.setBorder(new EmptyBorder(15, 20, 10, 20));
 
         // gauche : recherche + filtre
-        JPanel panelSearch = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel panelSearch = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        panelSearch.setBackground(BG_WHITE);
+
+        JLabel lblRecherche = new JLabel("Recherche:");
+        lblRecherche.setForeground(GRAY_TEXT);
+        lblRecherche.setFont(new Font("Segoe UI", Font.BOLD, 12));
+
         txtRecherche = new JTextField(16);
+        styleInput(txtRecherche);
+
+        JLabel lblStatut = new JLabel("Statut:");
+        lblStatut.setForeground(GRAY_TEXT);
+        lblStatut.setFont(new Font("Segoe UI", Font.BOLD, 12));
 
         cbStatut = new JComboBox<>();
         cbStatut.addItem("Tous");
         for (StatutReparation s : StatutReparation.values()) {
             cbStatut.addItem(s);
         }
+        styleCombo(cbStatut);
 
-        btnRechercher = new JButton("Rechercher");
-        btnActualiser = new JButton("Actualiser");
+        btnRechercher = createButton("Rechercher", MAIN_COLOR);
+        btnActualiser = createButton("Actualiser", new Color(149, 165, 166));
 
-        panelSearch.add(new JLabel("Recherche:"));
+        panelSearch.add(lblRecherche);
         panelSearch.add(txtRecherche);
-        panelSearch.add(new JLabel("Statut:"));
+        panelSearch.add(lblStatut);
         panelSearch.add(cbStatut);
         panelSearch.add(btnRechercher);
         panelSearch.add(btnActualiser);
 
         // droite : Ajouter
-        JPanel panelRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        btnAjouter = new JButton("+ Ajouter");
+        JPanel panelRight = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        panelRight.setBackground(BG_WHITE);
+
+        btnAjouter = createButton("+ Ajouter", MAIN_COLOR);
         panelRight.add(btnAjouter);
 
-        // events
+        // events (logique inchangée)
         btnRechercher.addActionListener(e -> refresh());
         btnActualiser.addActionListener(e -> {
             txtRecherche.setText("");
@@ -119,21 +153,27 @@ public class ReparationsPanel extends JPanel {
 
         table = new JTable(tableModel);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        styleTable(table);
 
         TableColumn idCol = table.getColumnModel().getColumn(0);
         idCol.setMinWidth(0);
         idCol.setMaxWidth(0);
         idCol.setPreferredWidth(0);
 
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        JScrollPane sp = new JScrollPane(table);
+        sp.getViewport().setBackground(Color.WHITE);
+        sp.setBorder(new LineBorder(BORDER_LIGHT, 1));
+        add(sp, BorderLayout.CENTER);
     }
 
     private void initActionsBar() {
-        JPanel panelActions = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel panelActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+        panelActions.setBackground(BG_WHITE);
+        panelActions.setBorder(new EmptyBorder(10, 20, 15, 20));
 
-        btnDetail = new JButton("Détail");
-        btnChangerStatut = new JButton("Changer statut");
-        btnAnnuler = new JButton("Annuler");
+        btnDetail = createButton("Détail", new Color(149, 165, 166));
+        btnChangerStatut = createButton("Changer statut", MAIN_COLOR);
+        btnAnnuler = createButton("Annuler", new Color(231, 76, 60));
 
         btnDetail.addActionListener(e -> onDetail());
         btnChangerStatut.addActionListener(e -> onChangerStatut());
@@ -226,6 +266,7 @@ public class ReparationsPanel extends JPanel {
         StatutReparation current = (stObj instanceof StatutReparation) ? (StatutReparation) stObj : null;
 
         JComboBox<StatutReparation> cb = new JComboBox<>(StatutReparation.values());
+        cb.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         if (current != null) cb.setSelectedItem(current);
 
         int ok = JOptionPane.showConfirmDialog(
@@ -289,5 +330,62 @@ public class ReparationsPanel extends JPanel {
 
     private static String safe(String s) {
         return s == null ? "" : s;
+    }
+
+    // ====== Helpers style (copiés du style V2) ======
+
+    private JButton createButton(String text, Color bg) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        btn.setBackground(bg);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(140, 38));
+
+        btn.addMouseListener(new MouseAdapter() {
+            @Override public void mouseEntered(MouseEvent e) { btn.setBackground(bg.darker()); }
+            @Override public void mouseExited(MouseEvent e) { btn.setBackground(bg); }
+        });
+        return btn;
+    }
+
+    private void styleInput(JTextField txt) {
+        txt.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        txt.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(200, 200, 200)),
+                new EmptyBorder(5, 8, 5, 8)
+        ));
+    }
+
+    private void styleCombo(JComboBox<?> cb) {
+        cb.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        cb.setBackground(Color.WHITE);
+        cb.setBorder(new LineBorder(new Color(200, 200, 200)));
+    }
+
+    private void styleTable(JTable t) {
+        t.setRowHeight(40);
+        t.setShowVerticalLines(false);
+        t.setShowHorizontalLines(true);
+        t.setGridColor(new Color(240, 240, 240));
+        t.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        t.setSelectionBackground(new Color(235, 248, 245));
+        t.setSelectionForeground(Color.BLACK);
+
+        JTableHeader header = t.getTableHeader();
+        header.setDefaultRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
+                                                           boolean hasFocus, int row, int column) {
+                JLabel l = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                l.setBackground(Color.WHITE);
+                l.setForeground(GRAY_TEXT);
+                l.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                l.setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(240, 240, 240)));
+                return l;
+            }
+        });
     }
 }
