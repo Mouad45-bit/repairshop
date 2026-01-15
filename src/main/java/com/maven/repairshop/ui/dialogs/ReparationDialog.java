@@ -80,9 +80,12 @@ public class ReparationDialog extends JDialog {
 
         cbClient = new JComboBox<>();
         cbClient.setRenderer(new DefaultListCellRenderer() {
-            @Override public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                if (value instanceof Client c) setText(c.getNom() + (c.getTelephone() != null ? " — " + c.getTelephone() : ""));
+                if (value instanceof Client c) {
+                    setText(c.getNom() + (c.getTelephone() != null ? " — " + c.getTelephone() : ""));
+                }
                 return this;
             }
         });
@@ -179,6 +182,7 @@ public class ReparationDialog extends JDialog {
 
     private void loadClients() {
         try {
+            // Dans la base "stab", ClientService.rechercher(...) est: rechercher(query, reparateurId, userId)
             Long userId = session.getCurrentUser().getId();
             Long reparateurId = (session.getCurrentUser() instanceof Reparateur) ? userId : null;
 
@@ -232,16 +236,20 @@ public class ReparationDialog extends JDialog {
                 return;
             }
 
+            // UI : on garde appareils/avance/commentaire pour plus tard (quand le backend expose ces champs)
+            // Pour l’instant, le backend "stab" crée la réparation avec (clientId, reparateurId) uniquement.
+
+            // Validation UI minimale : on te laisse garder la règle "au moins 1 appareil"
             if (appareilsModel.getRowCount() == 0) {
                 UiDialogs.error(this, "Ajoutez au moins un appareil.");
                 return;
             }
 
-            Double avance = null;
+            // On continue de valider l’avance côté UI (mais elle ne part pas au backend pour l’instant)
             String avanceTxt = txtAvance.getText().trim();
             if (!avanceTxt.isEmpty()) {
                 try {
-                    avance = Double.parseDouble(avanceTxt);
+                    double avance = Double.parseDouble(avanceTxt);
                     if (avance < 0) throw new NumberFormatException();
                 } catch (NumberFormatException nfe) {
                     UiDialogs.error(this, "Avance invalide (nombre >= 0).");
@@ -249,6 +257,7 @@ public class ReparationDialog extends JDialog {
                 }
             }
 
+            // On construit la liste d'appareils (UI-only pour l’instant)
             List<Appareil> appareils = new ArrayList<>();
             for (int i = 0; i < appareilsModel.getRowCount(); i++) {
                 Appareil a = new Appareil();
@@ -259,19 +268,22 @@ public class ReparationDialog extends JDialog {
             }
 
             Long userId = session.getCurrentUser().getId();
-            Long reparateurId = (session.getCurrentUser() instanceof Reparateur) ? userId : client.getReparateur().getId();
+            Long reparateurId = (session.getCurrentUser() instanceof Reparateur)
+                    ? userId
+                    : (client.getReparateur() != null ? client.getReparateur().getId() : null);
 
-            created = reparationCtrl.creerReparation(
-                    client.getId(),
-                    reparateurId,
-                    appareils,
-                    txtCommentaireClient.getText().trim(),
-                    avance,
-                    userId
-            );
+            if (reparateurId == null) {
+                UiDialogs.error(this, "Impossible de déterminer le réparateur pour ce client.");
+                return;
+            }
+
+            created = reparationCtrl.creerReparation(client.getId(), reparateurId);
 
             saved = true;
-            UiDialogs.success(this, "Réparation créée : " + created.getCodeUnique());
+            UiDialogs.success(this,
+                    "Réparation créée : " + created.getCodeUnique() +
+                            "\n\nNote: appareils/avance/commentaire seront gérés dans les prochaines étapes (services backend)."
+            );
             dispose();
 
         } catch (BusinessException ex) {

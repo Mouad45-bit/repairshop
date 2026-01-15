@@ -5,6 +5,7 @@ import com.maven.repairshop.model.Reparation;
 import com.maven.repairshop.model.Reparateur;
 import com.maven.repairshop.model.enums.StatutReparation;
 import com.maven.repairshop.ui.controllers.ReparationController;
+import com.maven.repairshop.ui.dialogs.ReparationDetailDialog;
 import com.maven.repairshop.ui.dialogs.ReparationDialog;
 import com.maven.repairshop.ui.session.SessionContext;
 import com.maven.repairshop.ui.util.UiDialogs;
@@ -120,7 +121,7 @@ public class ReparationsPanel extends JPanel {
             Object sel = cbStatut.getSelectedItem();
             if (sel instanceof StatutReparation s) statut = s;
 
-            List<Reparation> list = reparationCtrl.rechercher(q, reparateurId, statut, userId);
+            List<Reparation> list = reparationCtrl.rechercher(q, reparateurId, statut);
 
             for (Reparation r : list) {
                 String client = (r.getClient() != null) ? r.getClient().getNom() : "-";
@@ -168,19 +169,11 @@ public class ReparationsPanel extends JPanel {
             return;
         }
 
-        // étape suivante (après) : ReparationDetailDialog complet
-        // pour l’instant on affiche un résumé propre
-        int row = table.getSelectedRow();
-        String code = String.valueOf(model.getValueAt(row, 1));
-        String client = String.valueOf(model.getValueAt(row, 2));
-        String statut = String.valueOf(model.getValueAt(row, 4));
+        ReparationDetailDialog dlg =
+                new ReparationDetailDialog(SwingUtilities.getWindowAncestor(this), session, id);
+        dlg.setVisible(true);
 
-        UiDialogs.success(this,
-                "Réparation\n\n" +
-                        "Code: " + code + "\n" +
-                        "Client: " + client + "\n" +
-                        "Statut: " + statut + "\n\n" +
-                        "Étape suivante: écran Détail + changement statut + paiements/objets/causes."
-        );
+        // après fermeture du détail
+        refresh();
     }
 }
