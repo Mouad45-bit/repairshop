@@ -70,7 +70,7 @@ public class MainFrame extends JFrame {
         menu.setLayout(new BoxLayout(menu, BoxLayout.Y_AXIS));
         menu.setOpaque(false);
 
-        // Pages (placeholders au début, on les remplace fichier par fichier)
+        // Pages
         register("dashboard", new DashboardPanel(session));
 
         if (session.isReparateur()) {
@@ -84,22 +84,25 @@ public class MainFrame extends JFrame {
             register("boutique", new com.maven.repairshop.ui.pages.BoutiquePanel(session));
             register("reparateurs", new com.maven.repairshop.ui.pages.ReparateursPanel(session));
             register("all_caisses", new NotImplementedPanel("Toutes les caisses"));
-            register("all_reparations", new NotImplementedPanel("Toutes les réparations"));
-            register("stats", new NotImplementedPanel("Statistiques"));
+            register("allReparations", new com.maven.repairshop.ui.pages.AllReparationsPanel(session));
+            register("stats", new com.maven.repairshop.ui.pages.StatsPanel(session));
         }
 
+        // Menu
         addMenuButton(menu, "Dashboard", "dashboard");
+
         if (session.isReparateur()) {
             addMenuButton(menu, "Réparations", "reparations");
             addMenuButton(menu, "Clients", "clients");
             addMenuButton(menu, "Emprunts", "emprunts");
             addMenuButton(menu, "Caisse", "caisse");
         }
+
         if (session.isProprietaire()) {
-            addMenuButton(menu, "Boutiques", "boutiques");
+            addMenuButton(menu, "Boutique", "boutique");
             addMenuButton(menu, "Réparateurs", "reparateurs");
             addMenuButton(menu, "Caisses", "all_caisses");
-            addMenuButton(menu, "Réparations", "all_reparations");
+            addMenuButton(menu, "Toutes réparations", "allReparations");
             addMenuButton(menu, "Stats", "stats");
         }
 
@@ -137,6 +140,10 @@ public class MainFrame extends JFrame {
     }
 
     private void showPage(String key) {
+        if (!pages.containsKey(key)) {
+            UiDialogs.error(this, "Page introuvable: " + key);
+            return;
+        }
         cardLayout.show(content, key);
     }
 
