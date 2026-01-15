@@ -81,8 +81,8 @@ public class MainFrame extends JFrame {
         }
 
         if (session.isProprietaire()) {
-            register("boutiques", new NotImplementedPanel("Boutiques"));
-            register("reparateurs", new NotImplementedPanel("Réparateurs"));
+            register("boutique", new com.maven.repairshop.ui.pages.BoutiquePanel(session));
+            register("reparateurs", new com.maven.repairshop.ui.pages.ReparateursPanel(session));
             register("all_caisses", new NotImplementedPanel("Toutes les caisses"));
             register("all_reparations", new NotImplementedPanel("Toutes les réparations"));
             register("stats", new NotImplementedPanel("Statistiques"));
