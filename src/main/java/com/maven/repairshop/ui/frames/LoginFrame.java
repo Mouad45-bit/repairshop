@@ -18,13 +18,14 @@ public class LoginFrame extends JFrame {
     private JTextField txtLogin;
     private JPasswordField txtPassword;
     private JButton btnLogin;
+    private JButton btnTracking; // client
 
     public LoginFrame(SessionContext session) {
         super("RepairShop — Connexion");
         this.session = session;
 
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        setSize(420, 280);
+        setSize(420, 320);
         setLocationRelativeTo(null);
 
         setContentPane(buildContent());
@@ -58,6 +59,7 @@ public class LoginFrame extends JFrame {
         txtLogin = new JTextField();
         txtPassword = new JPasswordField();
         btnLogin = new JButton("Se connecter");
+        btnTracking = new JButton("Suivi client (code)");
 
         c.gridy = 0;
         form.add(labeled("Login / Email", txtLogin), c);
@@ -68,7 +70,11 @@ public class LoginFrame extends JFrame {
         c.gridy = 2;
         form.add(btnLogin, c);
 
+        c.gridy = 3;
+        form.add(btnTracking, c);
+
         btnLogin.addActionListener(e -> doLogin());
+        btnTracking.addActionListener(e -> openTracking());
 
         root.add(head, BorderLayout.NORTH);
         root.add(form, BorderLayout.CENTER);
@@ -89,7 +95,7 @@ public class LoginFrame extends JFrame {
     private void doLogin() {
         btnLogin.setEnabled(false);
         try {
-            String login = txtLogin.getText();
+            String login = txtLogin.getText().trim();
             String pass = new String(txtPassword.getPassword());
 
             Utilisateur user = authController.login(login, pass);
@@ -107,5 +113,9 @@ public class LoginFrame extends JFrame {
         } finally {
             btnLogin.setEnabled(true);
         }
+    }
+
+    private void openTracking() {
+        SwingUtilities.invokeLater(() -> new ClientTrackingFrame().setVisible(true));
     }
 }
