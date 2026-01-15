@@ -76,7 +76,7 @@ public class MainFrame extends JFrame {
         if (session.isReparateur()) {
             register("reparations", new com.maven.repairshop.ui.pages.ReparationsPanel(session));
             register("clients", new com.maven.repairshop.ui.pages.ClientsPanel(session));
-            register("emprunts", new NotImplementedPanel("Emprunts"));
+            register("emprunts", new com.maven.repairshop.ui.pages.EmpruntsPanel(session));
             register("caisse", new NotImplementedPanel("Caisse"));
         }
 
